@@ -4,12 +4,9 @@ package httpsignatures
 
 import (
 	"crypto/hmac"
-	"crypto/sha1"
-	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"hash"
 	"net/http"
 	"regexp"
 	"strings"
@@ -22,14 +19,10 @@ const (
 	RequestTarget = "(request-target)"
 
 	authScheme = "Signature "
-
-	AlgorithmHmacSha256 = "hmac-sha256"
-	AlgorithmHmacSha1   = "hmac-sha1"
 )
 
 var (
 	ErrorNoSignatureHeader = errors.New("No Signature header found in request")
-	ErrorUnknownAlgorithm  = errors.New("Unknown Algorithm")
 
 	signatureRegex = regexp.MustCompile(`(\w+)="([^"]*)"`)
 )
@@ -37,12 +30,12 @@ var (
 // Signature is the hashed key + headers, either from a request or a signer
 type Signature struct {
 	KeyID     string
-	Algorithm string
+	Algorithm *Algorithm
 	Headers   HeaderList
 	Signature string
 }
 
-// NewSignatureFromRequest creates a new Signature from the Request
+// FromRequest creates a new Signature from the Request
 // both Signature and Authorization http headers are supported.
 func FromRequest(r *http.Request) (*Signature, error) {
 	if s, ok := r.Header[headerSignature]; ok {
@@ -54,7 +47,7 @@ func FromRequest(r *http.Request) (*Signature, error) {
 	return nil, ErrorNoSignatureHeader
 }
 
-// NewSignatureFromString creates a new Signature from its encoded form,
+// FromString creates a new Signature from its encoded form,
 // eg `keyId="a",algorithm="b",headers="c",signature="d"`
 func FromString(in string) (*Signature, error) {
 	var res Signature = Signature{}
@@ -68,7 +61,11 @@ func FromString(in string) (*Signature, error) {
 		if key == "keyId" {
 			res.KeyID = value
 		} else if key == "algorithm" {
-			res.Algorithm = value
+			alg, err := algorithmFromString(value)
+			if err != nil {
+				return nil, err
+			}
+			res.Algorithm = alg
 		} else if key == "headers" {
 			res.Headers = headerListFromString(value)
 		} else if key == "signature" {
@@ -82,23 +79,23 @@ func FromString(in string) (*Signature, error) {
 		return nil, errors.New("Missing signature")
 	}
 
-	if len(res.Algorithm) == 0 {
-		return nil, errors.New("Missing algorithm")
-	}
-
 	if len(res.KeyID) == 0 {
 		return nil, errors.New("Missing keyId")
+	}
+
+	if res.Algorithm == nil {
+		return nil, errors.New("Missing algorithm")
 	}
 
 	return &res, nil
 }
 
-// ToString returns the encoded form of the Signature
+// String returns the encoded form of the Signature
 func (s Signature) String() string {
 	str := fmt.Sprintf(
 		`keyId="%s",algorithm="%s",signature="%s"`,
 		s.KeyID,
-		s.Algorithm,
+		s.Algorithm.name,
 		s.Signature,
 	)
 
@@ -110,10 +107,7 @@ func (s Signature) String() string {
 }
 
 func (s Signature) calculateSignature(key string, r *http.Request) (string, error) {
-	hash, err := hasher(s.Algorithm, key)
-	if err != nil {
-		return "", err
-	}
+	hash := hmac.New(s.Algorithm.hash, []byte(key))
 
 	signingString, err := s.Headers.signingString(r)
 	if err != nil {
@@ -185,17 +179,6 @@ func (h HeaderList) signingString(req *http.Request) (string, error) {
 	}
 
 	return strings.Join(lines, "\n"), nil
-}
-
-func hasher(alg string, key string) (hash.Hash, error) {
-	switch alg {
-	case AlgorithmHmacSha1:
-		return hmac.New(sha1.New, []byte(key)), nil
-	case AlgorithmHmacSha256:
-		return hmac.New(sha256.New, []byte(key)), nil
-	default:
-		return nil, ErrorUnknownAlgorithm
-	}
 }
 
 func requestTargetLine(req *http.Request) string {

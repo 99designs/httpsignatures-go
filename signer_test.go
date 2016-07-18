@@ -21,8 +21,8 @@ func TestSignSha1(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, TEST_KEY_ID, s.KeyID)
-	assert.Equal(t, DefaultSha1Signer.Algorithm, s.Algorithm)
-	assert.Equal(t, DefaultSha1Signer.Headers, s.Headers)
+	assert.Equal(t, DefaultSha1Signer.algorithm, s.Algorithm)
+	assert.Equal(t, DefaultSha1Signer.headers, s.Headers)
 
 	assert.Equal(t,
 		"RIdBXxLb6gWsu3bZtq3rQWSR1nk=",
@@ -44,8 +44,8 @@ func TestSignSha256(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, TEST_KEY_ID, s.KeyID)
-	assert.Equal(t, DefaultSha256Signer.Algorithm, s.Algorithm)
-	assert.Equal(t, DefaultSha256Signer.Headers, s.Headers)
+	assert.Equal(t, DefaultSha256Signer.algorithm, s.Algorithm)
+	assert.Equal(t, DefaultSha256Signer.headers, s.Headers)
 
 	assert.Equal(t,
 		"mIX1nFtRDhvv8HIUSNpE3NQZZ6EIY98ObNkJM+Oq7AU=",
@@ -69,21 +69,8 @@ func TestSignWithMissingHeader(t *testing.T) {
 		},
 	}
 
-	s := Signer{AlgorithmHmacSha1, HeaderList{"foo"}}
+	s := NewSigner(AlgorithmHmacSha1, "foo")
 
 	err := s.SignRequest(TEST_KEY_ID, TEST_KEY, r)
 	assert.Equal(t, "Missing required header 'foo'", err.Error())
-}
-
-func TestSignWithInvalidAlgorithm(t *testing.T) {
-	s := Signer{"hmac-turtles", HeaderList{RequestTarget, "date"}}
-
-	r := &http.Request{
-		Header: http.Header{
-			"Date": []string{"Thu, 05 Jan 2012 21:31:40 GMT"},
-		},
-	}
-
-	err := s.SignRequest("Test", "foo", r)
-	assert.Equal(t, "Unknown Algorithm", err.Error())
 }

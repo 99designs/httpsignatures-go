@@ -17,6 +17,19 @@ func Example_signing() {
 	http.DefaultClient.Do(r)
 }
 
+func Example_custom_signing() {
+	signer := httpsignatures.NewSigner(
+		httpsignatures.AlgorithmHmacSha256,
+		httpsignatures.RequestTarget, "date", "content-length",
+	)
+
+	r, _ := http.NewRequest("GET", "http://example.com/some-api", nil)
+
+	signer.SignRequest("KeyId", "Key", r)
+
+	http.DefaultClient.Do(r)
+}
+
 func Example_verification() {
 	_ = func(w http.ResponseWriter, r *http.Request) {
 		sig, err := httpsignatures.FromRequest(r)

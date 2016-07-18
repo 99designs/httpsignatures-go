@@ -2,13 +2,14 @@ package httpsignatures
 
 import (
 	"net/http"
+	"strings"
 	"time"
 )
 
 // Signer is used to create a signature for a given request.
 type Signer struct {
-	Algorithm string
-	Headers   HeaderList
+	algorithm *Algorithm
+	headers   HeaderList
 }
 
 var (
@@ -20,6 +21,19 @@ var (
 	// Users are encouraged to create their own signer with the headers they require.
 	DefaultSha256Signer = Signer{AlgorithmHmacSha256, HeaderList{RequestTarget, "date"}}
 )
+
+func NewSigner(algorithm *Algorithm, headers ...string) *Signer {
+	hl := HeaderList{}
+
+	for _, header := range headers {
+		hl = append(hl, strings.ToLower(header))
+	}
+
+	return &Signer{
+		algorithm: algorithm,
+		headers:   hl,
+	}
+}
 
 // SignRequest adds a http signature to the Signature: HTTP Header
 func (s Signer) SignRequest(id, key string, r *http.Request) error {
@@ -52,8 +66,8 @@ func (s Signer) buildSignature(id, key string, r *http.Request) (*Signature, err
 
 	sig := &Signature{
 		KeyID:     id,
-		Algorithm: s.Algorithm,
-		Headers:   s.Headers,
+		Algorithm: s.algorithm,
+		Headers:   s.headers,
 	}
 
 	err := sig.sign(key, r)

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	TEST_SIGNATURE = `keyId="Test",algorithm="rsa-sha256",signature="JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ="`
+	TEST_SIGNATURE = `keyId="Test",algorithm="hmac-sha256",signature="JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ="`
 	TEST_HASH      = `JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ=`
 	TEST_KEY       = "SomethingRandom"
 	TEST_DATE      = "Thu, 05 Jan 2012 21:31:40 GMT"
@@ -27,7 +27,7 @@ func TestCreateSignatureFromAuthorizationHeader(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, "Test", s.KeyID)
-	assert.Equal(t, "rsa-sha256", s.Algorithm)
+	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
 	assert.Equal(t, TEST_HASH, s.Signature)
 
 	assert.Equal(t, s.String(), TEST_SIGNATURE)
@@ -45,7 +45,7 @@ func TestCreateSignatureFromSignatureHeaderHeader(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, "Test", s.KeyID)
-	assert.Equal(t, "rsa-sha256", s.Algorithm)
+	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
 	assert.Equal(t, TEST_HASH, s.Signature)
 
 	assert.Equal(t, s.String(), TEST_SIGNATURE)
@@ -64,7 +64,7 @@ func TestCreateSignatureWithNoSignature(t *testing.T) {
 }
 
 func TestCreateWithMissingSignature(t *testing.T) {
-	s, err := FromString(`keyId="Test",algorithm="rsa-sha256"`)
+	s, err := FromString(`keyId="Test",algorithm="hmac-sha256"`)
 	assert.Equal(t, "Missing signature", err.Error())
 	assert.Nil(t, s)
 }
@@ -76,13 +76,13 @@ func TestCreateWithMissingAlgorithm(t *testing.T) {
 }
 
 func TestCreateWithMissingKeyId(t *testing.T) {
-	s, err := FromString(`algorithm="rsa-sha256",signature="fffff"`)
+	s, err := FromString(`algorithm="hmac-sha256",signature="fffff"`)
 	assert.Equal(t, "Missing keyId", err.Error())
 	assert.Nil(t, s)
 }
 
 func TestCreateWithInvalidKey(t *testing.T) {
-	s, err := FromString(`keyId="Test",algorithm="rsa-sha256",signature="fffff",garbage="bob"`)
+	s, err := FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",garbage="bob"`)
 	assert.Equal(t, "Unexpected key in signature 'garbage'", err.Error())
 	assert.Nil(t, s)
 }
