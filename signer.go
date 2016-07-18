@@ -12,8 +12,13 @@ type Signer struct {
 }
 
 var (
-	DefaultSha1Signer   = Signer{ALGORITHM_HMAC_SHA1, HeaderList{REQUEST_TARGET, "date"}}
-	DefaultSha256Signer = Signer{ALGORITHM_HMAC_SHA256, HeaderList{REQUEST_TARGET, "date"}}
+	// DefaultSha1Signer will sign requests with the url and date using the SHA1 algorithm.
+	// Users are encouraged to create their own signer with the headers they require.
+	DefaultSha1Signer = Signer{AlgorithmHmacSha1, HeaderList{RequestTarget, "date"}}
+
+	// DefaultSha256Signer will sign requests with the url and date using the SHA256 algorithm.
+	// Users are encouraged to create their own signer with the headers they require.
+	DefaultSha256Signer = Signer{AlgorithmHmacSha256, HeaderList{RequestTarget, "date"}}
 )
 
 // SignRequest adds a http signature to the Signature: HTTP Header
@@ -23,7 +28,7 @@ func (s Signer) SignRequest(id, key string, r *http.Request) error {
 		return err
 	}
 
-	r.Header.Add(HEADER_SIGNATURE, sig.ToString())
+	r.Header.Add(headerSignature, sig.String())
 
 	return nil
 }
@@ -35,7 +40,7 @@ func (s Signer) AuthRequest(id, key string, r *http.Request) error {
 		return err
 	}
 
-	r.Header.Add(HEADER_AUTHORIZATION, AUTH_SCHEME+sig.ToString())
+	r.Header.Add(headerAuthorization, authScheme+sig.String())
 
 	return nil
 }
@@ -51,7 +56,7 @@ func (s Signer) buildSignature(id, key string, r *http.Request) (*Signature, err
 		Headers:   s.Headers,
 	}
 
-	err := sig.Sign(key, r)
+	err := sig.sign(key, r)
 	if err != nil {
 		return nil, err
 	}
