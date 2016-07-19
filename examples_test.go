@@ -17,7 +17,7 @@ func Example_signing() {
 	http.DefaultClient.Do(r)
 }
 
-func Example_custom_signing() {
+func Example_customSigning() {
 	signer := httpsignatures.NewSigner(
 		httpsignatures.AlgorithmHmacSha256,
 		httpsignatures.RequestTarget, "date", "content-length",
