@@ -61,7 +61,7 @@ func (s Signer) AuthRequest(id, key string, r *http.Request) error {
 
 func (s Signer) buildSignature(id, key string, r *http.Request) (*Signature, error) {
 	if r.Header.Get("date") == "" {
-		r.Header.Set("date", time.Now().Format(time.RFC1123))
+		r.Header.Set("date", time.Now().UTC().Format(time.RFC1123))
 	}
 
 	sig := &Signature{

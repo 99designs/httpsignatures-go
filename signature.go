@@ -10,10 +10,11 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"hash"
 )
 
 const (
-	headerSignature     = "Signature"
+	headerSignature = "Signature"
 	headerAuthorization = "Authorization"
 
 	RequestTarget = "(request-target)"
@@ -107,16 +108,13 @@ func (s Signature) String() string {
 }
 
 func (s Signature) calculateSignature(key string, r *http.Request) (string, error) {
-	hash := hmac.New(s.Algorithm.hash, []byte(key))
 
 	signingString, err := s.Headers.signingString(r)
 	if err != nil {
 		return "", err
 	}
-
-	hash.Write([]byte(signingString))
-
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
+	signature, err := s.Algorithm.sign(s.Algorithm.hash, key, signingString)
+	return base64.StdEncoding.EncodeToString(signature), nil
 }
 
 // Sign this signature using the given key
