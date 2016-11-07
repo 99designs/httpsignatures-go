@@ -26,7 +26,7 @@ var (
 type Algorithm struct {
 	name string
 	hash func() hash.Hash
-	sign func(hashFunc hash.Hash, key string, signingString string) string
+	sign func(hashFunc func() hash.Hash, key string, signingString string) ([]byte, error)
 }
 
 func algorithmFromString(name string) (*Algorithm, error) {
@@ -43,22 +43,25 @@ func algorithmFromString(name string) (*Algorithm, error) {
 	return nil, ErrorUnknownAlgorithm
 }
 
-func hmacSign(hashFunc hash.Hash, key string, signingString string) string {
+func hmacSign(hashFunc func() hash.Hash , key string, signingString string) ([]byte, error) {
 	hash := hmac.New(hashFunc, []byte(key))
 	hash.Write([]byte(signingString))
-	return hash.Sum(nil)
+	return hash.Sum(nil), nil
 }
 
-func rsaSign(hashFunc hash.Hash, key string, signingString string) string {
+func rsaSign(hashFunc func() hash.Hash, key string, signingString string) ([]byte, error) {
 	private_key, err := parsePrivateKey([]byte(key[:]))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	hash := hashFunc()
 	hash.Write([]byte(signingString))
 	d := hash.Sum(nil)
 	singed_hash, err := rsa.SignPKCS1v15(rand.Reader, private_key, crypto.SHA256, d)
-	return singed_hash
+	if err != nil {
+		return nil, err
+	}
+	return singed_hash, nil
 }
 
 func parsePrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {

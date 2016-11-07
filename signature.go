@@ -3,14 +3,12 @@
 package httpsignatures
 
 import (
-	"crypto/hmac"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
-	"hash"
 )
 
 const (
