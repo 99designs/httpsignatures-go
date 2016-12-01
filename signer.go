@@ -20,6 +20,14 @@ var (
 	// DefaultSha256Signer will sign requests with the url and date using the SHA256 algorithm.
 	// Users are encouraged to create their own signer with the headers they require.
 	DefaultSha256Signer = NewSigner(AlgorithmHmacSha256, RequestTarget, "date")
+
+	// DefaultSha1Signer will sign requests with the url and date using the SHA1 algorithm.
+	// Users are encouraged to create their own signer with the headers they require.
+	DefaultRsaSha1Signer = NewSigner(AlgorithmRsaSha1, RequestTarget, "date")
+
+	// DefaultRsaSha256Signer will sign requests with the url and date using the SHA256 algorithm.
+	// Users are encouraged to create their own signer with the headers they require.
+	DefaultRsaSha256Signer = NewSigner(AlgorithmRsaSha256, RequestTarget, "date")
 )
 
 func NewSigner(algorithm *Algorithm, headers ...string) *Signer {

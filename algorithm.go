@@ -17,8 +17,8 @@ import (
 var (
 	AlgorithmHmacSha256 = &Algorithm{"hmac-sha256", sha256.New, hmacSign}
 	AlgorithmHmacSha1   = &Algorithm{"hmac-sha1", sha1.New, hmacSign}
-	AlgorithmRsaSha1    = &Algorithm{"rsa-sha1", sha1.New, rsaSign}
-	AlgorithmRsaSha256  = &Algorithm{"rsa-sha256", sha256.New, rsaSign}
+	AlgorithmRsaSha1    = &Algorithm{"rsa-sha1", sha1.New, rsaSha1Sign}
+	AlgorithmRsaSha256  = &Algorithm{"rsa-sha256", sha256.New, rsaSha256Sign}
 
 	ErrorUnknownAlgorithm = errors.New("Unknown Algorithm")
 )
@@ -49,7 +49,15 @@ func hmacSign(hashFunc func() hash.Hash, key string, signingString string) ([]by
 	return hash.Sum(nil), nil
 }
 
-func rsaSign(hashFunc func() hash.Hash, key string, signingString string) ([]byte, error) {
+func rsaSha1Sign(hashFunc func() hash.Hash, key string, signingString string) ([]byte, error) {
+	return rsaSign(hashFunc, key, signingString, crypto.SHA1)
+}
+
+func rsaSha256Sign(hashFunc func() hash.Hash, key string, signingString string) ([]byte, error) {
+	return rsaSign(hashFunc, key, signingString, crypto.SHA256)
+}
+
+func rsaSign(hashFunc func() hash.Hash, key string, signingString string, hashType crypto.Hash) ([]byte, error) {
 	private_key, err := parsePrivateKey([]byte(key[:]))
 	if err != nil {
 		return nil, err
@@ -57,7 +65,7 @@ func rsaSign(hashFunc func() hash.Hash, key string, signingString string) ([]byt
 	hash := hashFunc()
 	hash.Write([]byte(signingString))
 	d := hash.Sum(nil)
-	singed_hash, err := rsa.SignPKCS1v15(rand.Reader, private_key, crypto.SHA256, d)
+	singed_hash, err := rsa.SignPKCS1v15(rand.Reader, private_key, hashType, d)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +74,6 @@ func rsaSign(hashFunc func() hash.Hash, key string, signingString string) ([]byt
 
 func parsePrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(pemBytes)
-	println(pemBytes)
 	if block == nil {
 		return nil, errors.New("ssh: no key found")
 	}

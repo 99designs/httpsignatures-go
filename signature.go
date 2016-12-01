@@ -112,6 +112,9 @@ func (s Signature) calculateSignature(key string, r *http.Request) (string, erro
 		return "", err
 	}
 	signature, err := s.Algorithm.sign(s.Algorithm.hash, key, signingString)
+	if err != nil {
+		return "", err
+	}
 	return base64.StdEncoding.EncodeToString(signature), nil
 }
 
