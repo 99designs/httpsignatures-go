@@ -1,24 +1,24 @@
 package httpsignatures
 
 import (
+	"crypto"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
-	"errors"
-	"hash"
-	"crypto/hmac"
-	"crypto/rsa"
-	"crypto"
-	"encoding/pem"
 	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"fmt"
-	"crypto/rand"
+	"hash"
 )
 
 var (
 	AlgorithmHmacSha256 = &Algorithm{"hmac-sha256", sha256.New, hmacSign}
-	AlgorithmHmacSha1 = &Algorithm{"hmac-sha1", sha1.New, hmacSign}
-	AlgorithmRsaSha1 = &Algorithm{"rsa-sha1", sha1.New, rsaSign}
-	AlgorithmRsaSha256 = &Algorithm{"rsa-sha256", sha256.New, rsaSign}
+	AlgorithmHmacSha1   = &Algorithm{"hmac-sha1", sha1.New, hmacSign}
+	AlgorithmRsaSha1    = &Algorithm{"rsa-sha1", sha1.New, rsaSign}
+	AlgorithmRsaSha256  = &Algorithm{"rsa-sha256", sha256.New, rsaSign}
 
 	ErrorUnknownAlgorithm = errors.New("Unknown Algorithm")
 )
@@ -43,7 +43,7 @@ func algorithmFromString(name string) (*Algorithm, error) {
 	return nil, ErrorUnknownAlgorithm
 }
 
-func hmacSign(hashFunc func() hash.Hash , key string, signingString string) ([]byte, error) {
+func hmacSign(hashFunc func() hash.Hash, key string, signingString string) ([]byte, error) {
 	hash := hmac.New(hashFunc, []byte(key))
 	hash.Write([]byte(signingString))
 	return hash.Sum(nil), nil

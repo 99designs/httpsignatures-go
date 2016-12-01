@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	headerSignature = "Signature"
+	headerSignature     = "Signature"
 	headerAuthorization = "Authorization"
 
 	RequestTarget = "(request-target)"
