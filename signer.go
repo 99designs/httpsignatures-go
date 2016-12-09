@@ -43,7 +43,7 @@ func (s Signer) SignRequest(id, key string, r *http.Request) error {
 		return err
 	}
 
-	r.Header.Add(headerSignature, sig.String())
+	r.Header.Add(HeaderSignature, sig.String())
 
 	return nil
 }

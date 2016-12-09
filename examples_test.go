@@ -3,7 +3,7 @@ package httpsignatures_test
 import (
 	"net/http"
 
-	"github.com/mvaneijk/httpsignatures-go"
+	"github.com/99designs/httpsignatures-go"
 )
 
 func Example_signing() {

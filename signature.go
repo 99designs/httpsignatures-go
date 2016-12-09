@@ -12,12 +12,10 @@ import (
 )
 
 const (
-	headerSignature     = "Signature"
+	HeaderSignature     = "Signature"
 	headerAuthorization = "Authorization"
-
-	RequestTarget = "(request-target)"
-
-	authScheme = "Signature "
+	RequestTarget       = "(request-target)"
+	authScheme          = "Signature "
 )
 
 var (
@@ -37,7 +35,7 @@ type Signature struct {
 // FromRequest creates a new Signature from the Request
 // both Signature and Authorization http headers are supported.
 func FromRequest(r *http.Request) (*Signature, error) {
-	if s, ok := r.Header[headerSignature]; ok {
+	if s, ok := r.Header[HeaderSignature]; ok {
 		return FromString(s[0])
 	}
 	if a, ok := r.Header[headerAuthorization]; ok {
@@ -147,7 +145,10 @@ func (s Signature) Verify(key string, r *http.Request) (bool, error) {
 	}
 
 	byteKey := []byte(key)
-	byteSignature, _:= base64.StdEncoding.DecodeString(s.Signature)
+	byteSignature, err := base64.StdEncoding.DecodeString(s.Signature)
+	if err != nil {
+		return false, err
+	}
 	result, err := s.Algorithm.Verify(&byteKey, []byte(signingString), &byteSignature)
 	if err != nil {
 		return false, err

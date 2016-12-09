@@ -9,24 +9,24 @@ import (
 )
 
 const (
-	Hmac1SignatureSize   = 20
-	Hmac256SignatureSize = 32
+	hmac1SignatureSize   = 20
+	hmac256SignatureSize = 32
 )
 
 func Hmac1Sign(privateKey *[]byte, message []byte) (*[]byte, error) {
-	return Sign(privateKey, message, sha1.New, Hmac1SignatureSize)
+	return Sign(privateKey, message, sha1.New, hmac1SignatureSize)
 }
 
 func Hmac256Sign(privateKey *[]byte, message []byte) (*[]byte, error) {
-	return Sign(privateKey, message, sha256.New, Hmac256SignatureSize)
+	return Sign(privateKey, message, sha256.New, hmac256SignatureSize)
 }
 
 func Hmac1Verify(privateKey *[]byte, message []byte, sig *[]byte) (bool, error) {
-	return Verify(privateKey, message, sha1.New, sig, Hmac1SignatureSize)
+	return Verify(privateKey, message, sha1.New, sig, hmac1SignatureSize)
 }
 
 func Hmac256Verify(privateKey *[]byte, message []byte, sig *[]byte) (bool, error) {
-	return Verify(privateKey, message, sha256.New, sig, Hmac256SignatureSize)
+	return Verify(privateKey, message, sha256.New, sig, hmac256SignatureSize)
 }
 
 func Sign(privateKey *[]byte, message []byte, hashFunc func() hash.Hash, signatureSize int) (*[]byte, error) {
