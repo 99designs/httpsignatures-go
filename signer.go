@@ -22,6 +22,7 @@ var (
 	DefaultSha256Signer = NewSigner(AlgorithmHmacSha256, RequestTarget, "date")
 )
 
+// NewSigner adds an algorithm to the signer algorithms
 func NewSigner(algorithm *Algorithm, headers ...string) *Signer {
 	hl := HeaderList{}
 
@@ -42,7 +43,7 @@ func (s Signer) SignRequest(id, key string, r *http.Request) error {
 		return err
 	}
 
-	r.Header.Add(headerSignature, sig.String())
+	r.Header.Add(HeaderSignature, sig.String())
 
 	return nil
 }
@@ -61,7 +62,7 @@ func (s Signer) AuthRequest(id, key string, r *http.Request) error {
 
 func (s Signer) buildSignature(id, key string, r *http.Request) (*Signature, error) {
 	if r.Header.Get("date") == "" {
-		r.Header.Set("date", time.Now().Format(time.RFC1123))
+		r.Header.Set("date", time.Now().UTC().Format(time.RFC1123))
 	}
 
 	sig := &Signature{
@@ -70,7 +71,7 @@ func (s Signer) buildSignature(id, key string, r *http.Request) (*Signature, err
 		Headers:   s.headers,
 	}
 
-	err := sig.sign(key, r)
+	err := sig.Sign(key, r)
 	if err != nil {
 		return nil, err
 	}
