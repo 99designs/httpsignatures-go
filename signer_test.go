@@ -29,6 +29,8 @@ const (
 	testKey        = "U29tZXRoaW5nUmFuZG9t"
 	testDate       = "Thu, 05 Jan 2012 21:31:40 GMT"
 	testKeyID      = "Test"
+
+	ed25519TestSignature = "yK9kWXAdp40MJzmjZnXhJcRaCClqgf9VpLrBUqCG6ywv85gCc0t4w/anI6zp5txyC13ICWMtNU22b+6AO1IQAA=="
 )
 
 // Signing
@@ -77,6 +79,34 @@ func TestSignSha256(t *testing.T) {
 	assert.Equal(t, HeaderList{"date": "Thu, 05 Jan 2012 21:31:40 GMT"}, s.Headers)
 	assert.Equal(t,
 		"QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI=",
+		s.Signature,
+	)
+}
+
+func TestValidEd25119RequestIsValid(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Date": []string{"Thu, 05 Jan 2012 21:31:40 GMT"},
+		},
+	}
+
+	// SignRequest places Signature header in request
+	keyLookUp := func(keyId string) string {
+		return ed25519TestPrivateKey
+	}
+	signer := NewSigner(ed25519TestPublicKey, keyLookUp, "ed25519")
+	err := signer.SignRequest(r)
+	assert.Nil(t, err)
+
+	// Read Signature header from request and verify fields
+	var s SignatureParameters
+	err = s.FromRequest(r)
+	assert.Nil(t, err)
+	assert.Equal(t, ed25519TestPublicKey, s.KeyID)
+	assert.Equal(t, algorithmEd25519, s.Algorithm)
+	assert.Equal(t, HeaderList{"date": "Thu, 05 Jan 2012 21:31:40 GMT"}, s.Headers)
+	assert.Equal(t,
+		ed25519TestSignature,
 		s.Signature,
 	)
 }

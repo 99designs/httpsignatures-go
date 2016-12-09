@@ -21,6 +21,7 @@ type SignatureParameters struct {
 const (
 	HeaderRequestTarget string = "(request-target)"
 	HeaderDate          string = "date"
+	HeaderHost          string = "host"
 )
 
 // FromRequest takes the signature string from the HTTP-Request
@@ -185,12 +186,12 @@ func (s SignatureParameters) calculateSignature(keyB64 string) (string, error) {
 		return "", err
 	}
 
-	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
+	signature, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
 	if err != nil {
 		return "", err
 	}
 
-	return base64.StdEncoding.EncodeToString(*hash), err
+	return base64.StdEncoding.EncodeToString(*signature), err
 }
 
 // Verify verifies this signature for the given base64 encodedkey
@@ -209,6 +210,7 @@ func (s SignatureParameters) Verify(keyBase64 string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	result, err := s.Algorithm.Verify(&byteKey, []byte(signingString), &byteSignature)
 	if err != nil {
 		return false, err

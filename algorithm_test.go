@@ -11,17 +11,22 @@ const (
 	hmacKey          = "SmVmZQ=="
 	hmacSHA1Cypher   = "7/zfauXrL6LSdBbV8YTfnCWafHk="
 	hmacSHA256Cypher = "W9zBRr9gdU5qBCQmCJV1x1oAPwidJzmDnexYuWTsOEM="
+
+	ed25519TestPrivateKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA7aie8zrakLWKjqNAqbw1zZTIVdx3iQ6Y6wEihi1naKQ=="
+	ed25519TestPublicKey  = "O2onvM62pC1io6jQKm8Nc2UyFXcd4kOmOsBIoYtZ2ik="
+	ed25519TestCypher     = "NMJEuJZU1b8iKQgS5MeFcTH3rU26gkJEz0l32hYZk0A5m08uprteyphXIk4Gqlf3bYL9dqBQU4Q/8mb82DVeCQ=="
 )
 
 var (
 	TestHmacSha1   = &TestAlgorithmData{"hmac-sha1", hmacKey, hmacKey, hmacSHA1Cypher}
 	TestHmacSha256 = &TestAlgorithmData{"hmac-sha256", hmacKey, hmacKey, hmacSHA256Cypher}
+	TestEd25519    = &TestAlgorithmData{"ed25519", ed25519TestPrivateKey, ed25519TestPublicKey, ed25519TestCypher}
 )
 
 type TestAlgorithmData struct {
 	Name       string
-	PublicKey  string
 	PrivateKey string
+	PublicKey  string
 	Cypher     string
 }
 
@@ -31,6 +36,8 @@ func getTestAlgorithmDataFromString(name string) (*TestAlgorithmData, error) {
 		return TestHmacSha1, nil
 	case TestHmacSha256.Name:
 		return TestHmacSha256, nil
+	case TestEd25519.Name:
+		return TestEd25519, nil
 	}
 
 	return nil, errorUnknownAlgorithm
@@ -38,7 +45,7 @@ func getTestAlgorithmDataFromString(name string) (*TestAlgorithmData, error) {
 
 // Test
 func TestAllAlgorithms(t *testing.T) {
-	algorithmList := []string{"hmac-sha1", "hmac-sha256"}
+	algorithmList := []string{"hmac-sha1", "hmac-sha256", "ed25519"}
 
 	for _, a := range algorithmList {
 		algorithm, err := algorithmFromString(a)

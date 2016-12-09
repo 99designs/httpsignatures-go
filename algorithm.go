@@ -7,9 +7,11 @@ import (
 var (
 	AlgorithmHmacSha1   = "hmac-sha1"
 	AlgorithmHmacSha256 = "hmac-sha256"
+	AlgorithmEd25519    = "ed25519"
 
 	algorithmHmacSha1   = &Algorithm{"hmac-sha1", Hmac1Sign, Hmac1Verify}
 	algorithmHmacSha256 = &Algorithm{"hmac-sha256", Hmac256Sign, Hmac256Verify}
+	algorithmEd25519    = &Algorithm{"ed25519", Ed25519Sign, Ed25519Verify}
 
 	errorUnknownAlgorithm = errors.New("Unknown Algorithm")
 )
@@ -23,10 +25,12 @@ type Algorithm struct {
 
 func algorithmFromString(name string) (*Algorithm, error) {
 	switch name {
-	case algorithmHmacSha1.Name:
+	case AlgorithmHmacSha1:
 		return algorithmHmacSha1, nil
-	case algorithmHmacSha256.Name:
+	case AlgorithmHmacSha256:
 		return algorithmHmacSha256, nil
+	case AlgorithmEd25519:
+		return algorithmEd25519, nil
 	}
 
 	return nil, errorUnknownAlgorithm
