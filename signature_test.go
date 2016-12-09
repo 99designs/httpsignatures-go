@@ -7,11 +7,14 @@ import (
 )
 
 const (
-	testSignature = `keyId="Test",algorithm="hmac-sha256",signature="JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ="`
-	testHash      = `JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ=`
-	testKey       = "U29tZXRoaW5nUmFuZG9t"
-	testDate      = "Thu, 05 Jan 2012 21:31:40 GMT"
-	testKeyID     = "Test"
+	testSignature         = `keyId="Test",algorithm="hmac-sha256",signature="JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ="`
+	testHash              = `JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ=`
+	testKey               = "U29tZXRoaW5nUmFuZG9t"
+	testDate              = "Thu, 05 Jan 2012 21:31:40 GMT"
+	testKeyID             = "Test"
+	testEd25519PrivateKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA7aie8zrakLWKjqNAqbw1zZTIVdx3iQ6Y6wEihi1naKQ=="
+	testEd25519PublicKey  = "O2onvM62pC1io6jQKm8Nc2UyFXcd4kOmOsBIoYtZ2ik="
+	ed25519TestSignature  = "ZDU6lMmO4fQp8wWTTviRyywsngZZYbpUVpVRQVwBtp5U/zwsJFm1eLsYxpFnpribcvKvM+nWNKBUKaH+R8RgAw=="
 )
 
 func TestCreateSignatureFromAuthorizationHeader(t *testing.T) {
@@ -99,6 +102,23 @@ func TestValidRequestIsValid(t *testing.T) {
 	assert.Nil(t, err)
 
 	res, err := sig.Verify(testKey, r)
+	assert.True(t, res)
+	assert.Nil(t, err)
+}
+
+func TestValidEd25119RequestIsValid(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Date": []string{testDate},
+		},
+	}
+	err := DefaultEd25519Signer.SignRequest(testKeyID, testEd25519PrivateKey, r)
+	assert.Nil(t, err)
+
+	sig, err := FromRequest(r)
+	assert.Nil(t, err)
+
+	res, err := sig.Verify(testEd25519PublicKey, r)
 	assert.True(t, res)
 	assert.Nil(t, err)
 }

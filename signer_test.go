@@ -53,6 +53,29 @@ func TestSignSha256(t *testing.T) {
 	)
 }
 
+func TestSignEd25519(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Date": []string{"Thu, 05 Jan 2012 21:31:40 GMT"},
+		},
+	}
+
+	err := DefaultEd25519Signer.SignRequest(testKeyID, testEd25519PrivateKey, r)
+	assert.Nil(t, err)
+
+	s, err := FromRequest(r)
+	assert.Nil(t, err)
+
+	assert.Equal(t, testKeyID, s.KeyID)
+	assert.Equal(t, DefaultEd25519Signer.algorithm, s.Algorithm)
+	assert.Equal(t, DefaultEd25519Signer.headers, s.Headers)
+
+	assert.Equal(t,
+		ed25519TestSignature,
+		s.Signature,
+	)
+}
+
 func TestSignWithMissingDateHeader(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
 

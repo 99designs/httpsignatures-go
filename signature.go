@@ -129,12 +129,12 @@ func (s *Signature) Sign(keyBase64 string, r *http.Request) error {
 		return err
 	}
 
-	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
+	signature, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
 	if err != nil {
 		return err
 	}
 
-	s.Signature = base64.StdEncoding.EncodeToString(*hash)
+	s.Signature = base64.StdEncoding.EncodeToString(*signature)
 	return nil
 }
 
@@ -158,6 +158,7 @@ func (s Signature) Verify(keyBase64 string, r *http.Request) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	result, err := s.Algorithm.Verify(&byteKey, []byte(signingString), &byteSignature)
 	if err != nil {
 		return false, err

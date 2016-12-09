@@ -20,6 +20,10 @@ var (
 	// DefaultSha256Signer will sign requests with the url and date using the SHA256 algorithm.
 	// Users are encouraged to create their own signer with the headers they require.
 	DefaultSha256Signer = NewSigner(AlgorithmHmacSha256, RequestTarget, "date")
+
+	// DefaultEd25519Signer will sign requests with the url and dat using the Ed25519 algorithm.
+	// Users are encouraged to create their own signer with the header they require.
+	DefaultEd25519Signer = NewSigner(AlgorithmEd25519, RequestTarget, "date")
 )
 
 // NewSigner adds an algorithm to the signer algorithms
