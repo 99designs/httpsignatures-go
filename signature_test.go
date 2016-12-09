@@ -99,7 +99,9 @@ func TestValidRequestIsValid(t *testing.T) {
 	sig, err := FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.True(t, sig.IsValid(TEST_KEY, r))
+	res, err := sig.Verify(TEST_KEY, r)
+	assert.True(t, res)
+	assert.Nil(t, err)
 }
 
 func TestNotValidIfRequestHeadersChange(t *testing.T) {
@@ -115,7 +117,9 @@ func TestNotValidIfRequestHeadersChange(t *testing.T) {
 	sig, err := FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.False(t, sig.IsValid(TEST_KEY, r))
+	res, err := sig.Verify(TEST_KEY, r)
+	assert.False(t, res)
+	assert.Nil(t, err)
 }
 
 func TestNotValidIfRequestIsMissingDate(t *testing.T) {
@@ -133,5 +137,7 @@ func TestNotValidIfRequestIsMissingDate(t *testing.T) {
 	sig, err := FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.False(t, sig.IsValid(TEST_KEY, r))
+	res, err := sig.Verify(TEST_KEY, r)
+	assert.False(t, res)
+	assert.Nil(t, err)
 }

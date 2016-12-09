@@ -3,7 +3,7 @@ package httpsignatures_test
 import (
 	"net/http"
 
-	"github.com/99designs/httpsignatures-go"
+	"github.com/mvaneijk/httpsignatures-go"
 )
 
 func Example_signing() {
@@ -43,9 +43,13 @@ func Example_verification() {
 		// that they are in sig.Headers
 
 		var key string // = lookup using sig.KeyID
-		if !sig.IsValid(key, r) {
+		res, err := sig.Verify(key, r)
+		if !res {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
+		}
+		if err != nil {
+			http.Error(w, "Error", http.StatusInternalServerError)
 		}
 
 		// request was signed correctly.

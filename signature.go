@@ -3,7 +3,6 @@
 package httpsignatures
 
 import (
-	"crypto/hmac"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -95,7 +94,7 @@ func (s Signature) String() string {
 	str := fmt.Sprintf(
 		`keyId="%s",algorithm="%s",signature="%s"`,
 		s.KeyID,
-		s.Algorithm.name,
+		s.Algorithm.Name,
 		s.Signature,
 	)
 
@@ -107,40 +106,53 @@ func (s Signature) String() string {
 }
 
 func (s Signature) calculateSignature(key string, r *http.Request) (string, error) {
-	hash := hmac.New(s.Algorithm.hash, []byte(key))
-
 	signingString, err := s.Headers.signingString(r)
 	if err != nil {
 		return "", err
 	}
 
-	hash.Write([]byte(signingString))
-
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
+	byteKey := []byte(key)
+	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(*hash), err
 }
 
 // Sign this signature using the given key
-func (s *Signature) sign(key string, r *http.Request) error {
-	sig, err := s.calculateSignature(key, r)
+func (s *Signature) Sign(key string, r *http.Request) error {
+	signingString, err := s.Headers.signingString(r)
 	if err != nil {
 		return err
 	}
 
-	s.Signature = sig
+	byteKey := []byte(key)
+	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
+	if err != nil {
+		return err
+	}
+	s.Signature = base64.StdEncoding.EncodeToString(*hash)
 	return nil
 }
 
-// IsValid validates this signature for the given key
-func (s Signature) IsValid(key string, r *http.Request) bool {
-	if !s.Headers.hasDate() {
-		return false
+// Verify verifies this signature for the given key
+func (s Signature) Verify(key string, r *http.Request) (bool, error) {
+	signingString, err := s.Headers.signingString(r)
+	if err != nil {
+		return false, err
 	}
 
-	sig, err := s.calculateSignature(key, r)
-	if err != nil {
-		return false
+	if !s.Headers.hasDate() {
+		return false, errors.New("No Date Header Supplied")
 	}
-	return s.Signature == sig
+
+	byteKey := []byte(key)
+	byteSignature, _:= base64.StdEncoding.DecodeString(s.Signature)
+	result, err := s.Algorithm.Verify(&byteKey, []byte(signingString), &byteSignature)
+	if err != nil {
+		return false, err
+	}
+	return result, nil
 }
 
 type HeaderList []string
