@@ -117,24 +117,29 @@ func (s Signature) calculateSignature(key string, r *http.Request) (string, erro
 	return base64.StdEncoding.EncodeToString(*hash), err
 }
 
-// Sign this signature using the given key
-func (s *Signature) Sign(key string, r *http.Request) error {
+// Sign this signature using the given base64 encoded key
+func (s *Signature) Sign(keyBase64 string, r *http.Request) error {
 	signingString, err := s.Headers.signingString(r)
 	if err != nil {
 		return err
 	}
 
-	byteKey := []byte(key)
-	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
+	byteKey, err := base64.StdEncoding.DecodeString(keyBase64)
 	if err != nil {
 		return err
 	}
-	s.Signature = base64.StdEncoding.EncodeToString(*hash)
+
+	signature, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
+	if err != nil {
+		return err
+	}
+
+	s.Signature = base64.StdEncoding.EncodeToString(*signature)
 	return nil
 }
 
-// Verify verifies this signature for the given key
-func (s Signature) Verify(key string, r *http.Request) (bool, error) {
+// Verify verifies this signature for the given base64 encodedkey
+func (s Signature) Verify(keyBase64 string, r *http.Request) (bool, error) {
 	signingString, err := s.Headers.signingString(r)
 	if err != nil {
 		return false, err
@@ -144,11 +149,16 @@ func (s Signature) Verify(key string, r *http.Request) (bool, error) {
 		return false, errors.New("No Date Header Supplied")
 	}
 
-	byteKey := []byte(key)
+	byteKey, err := base64.StdEncoding.DecodeString(keyBase64)
+	if err != nil {
+		return false, err
+	}
+
 	byteSignature, err := base64.StdEncoding.DecodeString(s.Signature)
 	if err != nil {
 		return false, err
 	}
+
 	result, err := s.Algorithm.Verify(&byteKey, []byte(signingString), &byteSignature)
 	if err != nil {
 		return false, err
