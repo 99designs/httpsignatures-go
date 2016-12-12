@@ -14,7 +14,7 @@ var (
 type Algorithm struct {
 	Name   string
 	Sign   func(privateKey *[]byte, message []byte) (*[]byte, error)
-	Verify func(privateKey *[]byte, message []byte, signature *[]byte) (bool, error)
+	Verify func(key *[]byte, message []byte, signature *[]byte) (bool, error)
 }
 
 func algorithmFromString(name string) (*Algorithm, error) {
