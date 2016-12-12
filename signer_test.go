@@ -17,7 +17,8 @@ func TestSignSha1(t *testing.T) {
 	err := DefaultSha1Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	s, err := FromRequest(r)
+	var s Signature
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, testKeyID, s.KeyID)
@@ -40,7 +41,8 @@ func TestSignSha256(t *testing.T) {
 	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	s, err := FromRequest(r)
+	var s Signature
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, testKeyID, s.KeyID)

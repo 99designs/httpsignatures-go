@@ -25,14 +25,15 @@ func TestCreateSignatureFromAuthorizationHeader(t *testing.T) {
 		},
 	}
 
-	s, err := FromRequest(&r)
+	var s Signature
+	err := s.FromRequest(&r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, "Test", s.KeyID)
 	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
 	assert.Equal(t, testHash, s.Signature)
 
-	assert.Equal(t, s.String(), testSignature)
+	assert.Equal(t, s.ToString(), testSignature)
 }
 
 func TestCreateSignatureFromSignatureHeaderHeader(t *testing.T) {
@@ -43,14 +44,15 @@ func TestCreateSignatureFromSignatureHeaderHeader(t *testing.T) {
 		},
 	}
 
-	s, err := FromRequest(&r)
+	var s Signature
+	err := s.FromRequest(&r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, "Test", s.KeyID)
 	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
 	assert.Equal(t, testHash, s.Signature)
 
-	assert.Equal(t, s.String(), testSignature)
+	assert.Equal(t, s.ToString(), testSignature)
 }
 
 func TestCreateSignatureWithNoSignature(t *testing.T) {
@@ -60,33 +62,38 @@ func TestCreateSignatureWithNoSignature(t *testing.T) {
 		},
 	}
 
-	s, err := FromRequest(&r)
+	var s Signature
+	err := s.FromRequest(&r)
 	assert.Equal(t, ErrorNoSignatureHeader, err)
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{}, s)
 }
 
 func TestCreateWithMissingSignature(t *testing.T) {
-	s, err := FromString(`keyId="Test",algorithm="hmac-sha256"`)
+	var s Signature
+	err := s.FromString(`keyId="Test",algorithm="hmac-sha256"`)
 	assert.Equal(t, "Missing signature", err.Error())
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{KeyID: "Test", Algorithm: AlgorithmHmacSha256}, s)
 }
 
 func TestCreateWithMissingAlgorithm(t *testing.T) {
-	s, err := FromString(`keyId="Test",signature="fffff"`)
+	var s Signature
+	err := s.FromString(`keyId="Test",signature="fffff"`)
 	assert.Equal(t, "Missing algorithm", err.Error())
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{KeyID: "Test", Signature: "fffff"}, s)
 }
 
 func TestCreateWithMissingKeyId(t *testing.T) {
-	s, err := FromString(`algorithm="hmac-sha256",signature="fffff"`)
+	var s Signature
+	err := s.FromString(`algorithm="hmac-sha256",signature="fffff"`)
 	assert.Equal(t, "Missing keyId", err.Error())
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{Algorithm: AlgorithmHmacSha256, Signature: "fffff"}, s)
 }
 
 func TestCreateWithInvalidKey(t *testing.T) {
-	s, err := FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",garbage="bob"`)
+	var s Signature
+	err := s.FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",garbage="bob"`)
 	assert.Equal(t, "Unexpected key in signature 'garbage'", err.Error())
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Signature: "fffff"}, s)
 }
 
 func TestValidRequestIsValid(t *testing.T) {
@@ -98,10 +105,11 @@ func TestValidRequestIsValid(t *testing.T) {
 	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	sig, err := FromRequest(r)
+	var s Signature
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
-	res, err := sig.Verify(testKey, r)
+	res, err := s.Verify(testKey, r)
 	assert.True(t, res)
 	assert.Nil(t, err)
 }
@@ -133,10 +141,11 @@ func TestNotValidIfRequestHeadersChange(t *testing.T) {
 	assert.Nil(t, err)
 
 	r.Header.Set("Date", "Thu, 05 Jan 2012 21:31:41 GMT")
-	sig, err := FromRequest(r)
+	var s Signature
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
-	res, err := sig.Verify(testKey, r)
+	res, err := s.Verify(testKey, r)
 	assert.False(t, res)
 	assert.Nil(t, err)
 }
@@ -146,15 +155,16 @@ func TestNotValidIfRequestIsMissingDate(t *testing.T) {
 		Header: http.Header{},
 	}
 
-	s := Signer{AlgorithmHmacSha1, HeaderList{RequestTarget}}
+	signer := Signer{AlgorithmHmacSha1, HeaderList{RequestTarget}}
 
-	err := s.SignRequest(testKeyID, testKey, r)
+	err := signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	sig, err := FromRequest(r)
+	var signature Signature
+	err = signature.FromRequest(r)
 	assert.Nil(t, err)
 
-	res, err := sig.Verify(testKey, r)
+	res, err := signature.Verify(testKey, r)
 	assert.False(t, res)
 	assert.EqualError(t, err, "No Date Header Supplied")
 }
