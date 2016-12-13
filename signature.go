@@ -11,13 +11,6 @@ import (
 	"strings"
 )
 
-const (
-	HeaderSignature     = "Signature"
-	headerAuthorization = "Authorization"
-	RequestTarget       = "(request-target)"
-	authScheme          = "Signature "
-)
-
 var (
 	ErrorNoSignatureHeader = errors.New("No Signature header found in request")
 
@@ -25,123 +18,44 @@ var (
 )
 
 // Signature is the hashed key + headers, either from a request or a signer
-type Signature struct {
-	KeyID     string
+type SignatureParameters struct {
 	Algorithm *Algorithm
+	KeyID     string
 	Headers   HeaderList
-	Signature string
 }
 
-// FromRequest creates a new Signature for the HTTP-Request
-// both Signature and Authorization http headers are supported.
-func (s *Signature) FromRequest(r *http.Request) error {
-	if sig, ok := r.Header[HeaderSignature]; ok {
-		return s.FromString(sig[0])
-	}
-	if a, ok := r.Header[headerAuthorization]; ok {
-		return s.FromString(strings.TrimPrefix(a[0], authScheme))
-	}
-	return ErrorNoSignatureHeader
-}
-
-// FromString creates a new Signature from its encoded form,
-// eg `keyId="a",algorithm="b",headers="c",signature="d"`
-func (s *Signature) FromString(in string) error {
-	var key string
-	var value string
-
-	for _, m := range signatureRegex.FindAllStringSubmatch(in, -1) {
-		key = m[1]
-		value = m[2]
-
-		if key == "keyId" {
-			s.KeyID = value
-		} else if key == "algorithm" {
-			alg, err := algorithmFromString(value)
-			if err != nil {
-				return err
-			}
-			s.Algorithm = alg
-		} else if key == "headers" {
-			s.Headers.FromString(value)
-		} else if key == "signature" {
-			s.Signature = value
-		} else {
-			return errors.New(fmt.Sprintf("Unexpected key in signature '%s'", key))
-		}
-	}
-
-	if len(s.Signature) == 0 {
-		return errors.New("Missing signature")
-	}
-
-	if len(s.KeyID) == 0 {
-		return errors.New("Missing keyId")
-	}
-
-	if s.Algorithm == nil {
-		return errors.New("Missing algorithm")
-	}
-
-	return nil
-}
-
-// String returns the encoded form of the Signature
-func (s Signature) ToString() string {
-	str := fmt.Sprintf(
-		`keyId="%s",algorithm="%s",signature="%s"`,
-		s.KeyID,
-		s.Algorithm.Name,
-		s.Signature,
-	)
-
-	if len(s.Headers) > 0 {
-		str += fmt.Sprintf(`,headers="%s"`, s.Headers.ToString())
-	}
-
-	return str
-}
-
-func (s Signature) Calculate(key string, r *http.Request) (string, error) {
-	signingString, err := s.Headers.signingString(r)
+func (a SignatureParameters) CalculateSignature(keyB64 string, r *http.Request) (string, error) {
+	signingString, err := a.Headers.signingString(r)
 	if err != nil {
 		return "", err
 	}
 
-	byteKey := []byte(key)
-	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
+	byteKey, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil {
+		return "", err
+	}
+	hash, err := a.Algorithm.Sign(&byteKey, []byte(signingString))
 	if err != nil {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(*hash), err
 }
 
-// Verify verifies this signature for the given base64 encodedkey
-func (s Signature) Verify(keyBase64 string, r *http.Request) (bool, error) {
-	signingString, err := s.Headers.signingString(r)
-	if err != nil {
-		return false, err
+// String returns the encoded form of the Signature
+func (sp SignatureParameters) SignatureString(signature string) string {
+	str := fmt.Sprintf(
+		`keyId="%s",algorithm="%s"`,
+		sp.KeyID,
+		sp.Algorithm.Name,
+	)
+
+	if len(sp.Headers) > 0 {
+		str += fmt.Sprintf(`,headers="%s"`, sp.Headers.ToString())
 	}
 
-	if !s.Headers.hasDate() {
-		return false, errors.New("No Date Header Supplied")
-	}
+	str += fmt.Sprintf(`,signature="%s"`, signature)
 
-	byteKey, err := base64.StdEncoding.DecodeString(keyBase64)
-	if err != nil {
-		return false, err
-	}
-
-	byteSignature, err := base64.StdEncoding.DecodeString(s.Signature)
-	if err != nil {
-		return false, err
-	}
-
-	result, err := s.Algorithm.Verify(&byteKey, []byte(signingString), &byteSignature)
-	if err != nil {
-		return false, err
-	}
-	return result, nil
+	return str
 }
 
 // HeaderList contains headers

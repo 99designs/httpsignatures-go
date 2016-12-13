@@ -17,17 +17,17 @@ func TestSignSha1(t *testing.T) {
 	err := DefaultSha1Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	var s Signature
-	err = s.FromRequest(r)
+	var v VerificationParameters
+	err = v.FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.Equal(t, testKeyID, s.KeyID)
-	assert.Equal(t, DefaultSha1Signer.algorithm, s.Algorithm)
-	assert.Equal(t, DefaultSha1Signer.headers, s.Headers)
+	assert.Equal(t, testKeyID, v.SigParams.KeyID)
+	assert.Equal(t, DefaultSha1Signer.algorithm, v.SigParams.Algorithm)
+	assert.Equal(t, DefaultSha1Signer.headers, v.SigParams.Headers)
 
 	assert.Equal(t,
 		"RIdBXxLb6gWsu3bZtq3rQWSR1nk=",
-		s.Signature,
+		v.Signature,
 	)
 }
 
@@ -41,17 +41,17 @@ func TestSignSha256(t *testing.T) {
 	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	var s Signature
-	err = s.FromRequest(r)
+	var v VerificationParameters
+	err = v.FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.Equal(t, testKeyID, s.KeyID)
-	assert.Equal(t, DefaultSha256Signer.algorithm, s.Algorithm)
-	assert.Equal(t, DefaultSha256Signer.headers, s.Headers)
+	assert.Equal(t, testKeyID, v.SigParams.KeyID)
+	assert.Equal(t, DefaultSha256Signer.algorithm, v.SigParams.Algorithm)
+	assert.Equal(t, DefaultSha256Signer.headers, v.SigParams.Headers)
 
 	assert.Equal(t,
 		"mIX1nFtRDhvv8HIUSNpE3NQZZ6EIY98ObNkJM+Oq7AU=",
-		s.Signature,
+		v.Signature,
 	)
 }
 

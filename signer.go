@@ -1,17 +1,17 @@
 package httpsignatures
 
 import (
-	"encoding/base64"
 	"net/http"
 	"strings"
 	"time"
 )
 
-// Signer is used to create a signature for a given request.
-type Signer struct {
-	algorithm *Algorithm
-	headers   HeaderList
-}
+const (
+	HeaderSignature     = "Signature"
+	HeaderAuthorization = "Authorization"
+	RequestTarget       = "(request-target)"
+	authScheme          = "Signature "
+)
 
 var (
 	// DefaultSha1Signer will sign requests with the url and date using the SHA1 algorithm.
@@ -26,6 +26,11 @@ var (
 	// Users are encouraged to create their own signer with the header they require.
 	DefaultEd25519Signer = NewSigner(AlgorithmEd25519, RequestTarget, "date")
 )
+
+type Signer struct {
+	algorithm *Algorithm
+	headers   HeaderList
+}
 
 // NewSigner adds an algorithm to the signer algorithms
 func NewSigner(algorithm *Algorithm, headers ...string) *Signer {
@@ -43,64 +48,42 @@ func NewSigner(algorithm *Algorithm, headers ...string) *Signer {
 
 // SignRequest adds a http signature to the Signature: HTTP Header
 func (s Signer) SignRequest(id, key string, r *http.Request) error {
-	sig, err := s.buildSignature(id, key, r)
+	signature, err := s.createSignature(id, key, r)
 	if err != nil {
 		return err
 	}
 
-	r.Header.Add(HeaderSignature, sig.ToString())
+	r.Header.Add(HeaderSignature, signature)
 
 	return nil
 }
 
 // AuthRequest adds a http signature to the Authorization: HTTP Header
 func (s Signer) AuthRequest(id, key string, r *http.Request) error {
-	sig, err := s.buildSignature(id, key, r)
+	signature, err := s.createSignature(id, key, r)
 	if err != nil {
 		return err
 	}
 
-	r.Header.Add(headerAuthorization, authScheme+sig.ToString())
+	r.Header.Add(HeaderAuthorization, authScheme+signature)
 
 	return nil
 }
 
-func (s Signer) buildSignature(id, key string, r *http.Request) (*Signature, error) {
+func (s Signer) createSignature(id, keyB64 string, r *http.Request) (string, error) {
 	if r.Header.Get("date") == "" {
 		r.Header.Set("date", time.Now().UTC().Format(time.RFC1123))
 	}
 
-	sig := &Signature{
+	sig := &SignatureParameters{
 		KeyID:     id,
 		Algorithm: s.algorithm,
 		Headers:   s.headers,
 	}
 
-	err := sig.Sign(key, r)
+	signature, err := sig.CalculateSignature(keyB64, r)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
-	return sig, nil
-}
-
-// Sign this signature using the given base64 encoded key
-func (s *Signature) Sign(keyBase64 string, r *http.Request) error {
-	signingString, err := s.Headers.signingString(r)
-	if err != nil {
-		return err
-	}
-
-	byteKey, err := base64.StdEncoding.DecodeString(keyBase64)
-	if err != nil {
-		return err
-	}
-
-	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
-	if err != nil {
-		return err
-	}
-
-	s.Signature = base64.StdEncoding.EncodeToString(*hash)
-	return nil
+	return sig.SignatureString(signature), nil
 }
