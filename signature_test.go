@@ -1,60 +1,62 @@
 package httpsignatures
 
 import (
-// "github.com/stretchr/testify/assert"
-// "net/http"
-// "testing"
+	"github.com/stretchr/testify/assert"
+	"net/http"
+	"testing"
 )
 
 const (
-	testSignature         = `keyId="Test",algorithm="hmac-sha256",signature="JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ="`
-	testHash              = `JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ=`
-	testKey               = "U29tZXRoaW5nUmFuZG9t"
-	testDate              = "Thu, 05 Jan 2012 21:31:40 GMT"
-	testKeyID             = "Test"
-	testEd25519PrivateKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA7aie8zrakLWKjqNAqbw1zZTIVdx3iQ6Y6wEihi1naKQ=="
-	testEd25519PublicKey  = "O2onvM62pC1io6jQKm8Nc2UyFXcd4kOmOsBIoYtZ2ik="
-	ed25519TestSignature  = "ZDU6lMmO4fQp8wWTTviRyywsngZZYbpUVpVRQVwBtp5U/zwsJFm1eLsYxpFnpribcvKvM+nWNKBUKaH+R8RgAw=="
+	testSignature = `keyId="Test",algorithm="hmac-sha256",signature="QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI="`
+	// testHash      = `JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ=`
+	testHash  = `QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI=`
+	testKey   = "U29tZXRoaW5nUmFuZG9t"
+	testDate  = "Thu, 05 Jan 2012 21:31:40 GMT"
+	testKeyID = "Test"
 )
 
-// // Test
-// func TestVerifySignatureFromAuthorizationHeader(t *testing.T) {
-// 	r := http.Request{
-// 		Header: http.Header{
-// 			"Date":              []string{testDate},
-// 			HeaderAuthorization: []string{authScheme + testSignature},
-// 		},
-// 	}
+// Test
+func TestVerifySignatureFromAuthorizationHeader(t *testing.T) {
 
-// 	var s SignatureParameters
-// 	err := s.FromRequest(&r)
-// 	assert.Nil(t, err)
+	r := &http.Request{
+		Header: http.Header{
+			"Date":              []string{testDate},
+			HeaderAuthorization: []string{authScheme + testSignature},
+		},
+	}
 
-// 	assert.Equal(t, "Test", s.KeyID)
-// 	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
-// 	assert.Equal(t, testHash, s.Signature)
+	var v VerificationParameters
+	err := v.FromRequest(r)
+	assert.Nil(t, err)
+	assert.Equal(t, "Test", v.SigParams.KeyID)
+	assert.Equal(t, AlgorithmHmacSha256, v.SigParams.Algorithm)
+	assert.Equal(t, testHash, v.Signature)
 
-// 	assert.Equal(t, s.SignatureString(), testSignature)
-// }
+	valid, err := v.Verify(testKey, r)
+	assert.Nil(t, err)
+	assert.Equal(t, true, valid)
+}
 
-// func TestCreateSignatureFromSignatureHeaderHeader(t *testing.T) {
-// 	r := http.Request{
-// 		Header: http.Header{
-// 			"Date":          []string{testDate},
-// 			HeaderSignature: []string{testSignature},
-// 		},
-// 	}
+func TestCreateSignatureFromSignatureHeaderHeader(t *testing.T) {
+	r := http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			HeaderSignature: []string{testSignature},
+		},
+	}
 
-// 	var s SignatureParameters
-// 	err := s.FromRequest(&r)
-// 	assert.Nil(t, err)
+	var v VerificationParameters
+	err := v.FromRequest(&r)
+	assert.Nil(t, err)
 
-// 	assert.Equal(t, "Test", s.KeyID)
-// 	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
-// 	assert.Equal(t, testHash, s.Signature)
+	assert.Equal(t, "Test", v.SigParams.KeyID)
+	assert.Equal(t, AlgorithmHmacSha256, v.SigParams.Algorithm)
+	// assert.Equal(t, testHash, v.Signature)
 
-// 	assert.Equal(t, s.SignatureString(), testSignature)
-// }
+	valid, err := v.Verify(testKey, &r)
+	assert.Nil(t, err)
+	assert.Equal(t, true, valid)
+}
 
 // func TestCreateSignatureWithNoSignature(t *testing.T) {
 // 	r := http.Request{
@@ -67,34 +69,6 @@ const (
 // 	err := s.FromRequest(&r)
 // 	assert.Equal(t, ErrorNoSignatureHeader, err)
 // 	assert.Equal(t, SignatureParameters{}, s)
-// }
-
-// func TestCreateWithMissingSignature(t *testing.T) {
-// 	var s SignatureParameters
-// 	err := s.FromString(`keyId="Test",algorithm="hmac-sha256"`)
-// 	assert.Equal(t, "Missing signature", err.Error())
-// 	assert.Equal(t, SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256}, s)
-// }
-
-// func TestCreateWithMissingAlgorithm(t *testing.T) {
-// 	var s SignatureParameters
-// 	err := s.FromString(`keyId="Test",signature="fffff"`)
-// 	assert.Equal(t, "Missing algorithm", err.Error())
-// 	assert.Equal(t, SignatureParameters{KeyID: "Test", Signature: "fffff"}, s)
-// }
-
-// func TestCreateWithMissingKeyId(t *testing.T) {
-// 	var s SignatureParameters
-// 	err := s.FromString(`algorithm="hmac-sha256",signature="fffff"`)
-// 	assert.Equal(t, "Missing keyId", err.Error())
-// 	assert.Equal(t, SignatureParameters{Algorithm: AlgorithmHmacSha256, Signature: "fffff"}, s)
-// }
-
-// func TestCreateWithInvalidKey(t *testing.T) {
-// 	var s SignatureParameters
-// 	err := s.FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",garbage="bob"`)
-// 	assert.Equal(t, "Unexpected key in signature 'garbage'", err.Error())
-// 	assert.Equal(t, SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Signature: "fffff"}, s)
 // }
 
 // func TestValidRequestIsValid(t *testing.T) {

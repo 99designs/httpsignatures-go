@@ -5,7 +5,6 @@ package httpsignatures
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 )
@@ -33,39 +32,41 @@ func (v *VerificationParameters) FromRequest(r *http.Request) error {
 func (v *VerificationParameters) FromString(in string) error {
 	var key string
 	var value string
-	var sigParams SignatureParameters
-	v.SigParams = &sigParams
+	v.SigParams = new(SignatureParameters)
 
 	for _, m := range signatureRegex.FindAllStringSubmatch(in, -1) {
 		key = m[1]
 		value = m[2]
 
 		if key == "keyId" {
-			sigParams.KeyID = value
+			v.SigParams.KeyID = value
 		} else if key == "algorithm" {
 			alg, err := algorithmFromString(value)
 			if err != nil {
 				return err
 			}
-			sigParams.Algorithm = alg
+			v.SigParams.Algorithm = alg
 		} else if key == "headers" {
-			sigParams.Headers.FromString(value)
+			v.SigParams.Headers.FromString(value)
 		} else if key == "signature" {
 			v.Signature = value
-		} else {
-			return errors.New(fmt.Sprintf("Unexpected key in signature '%s'", key))
 		}
+		// ignore unknown parameters
+	}
+
+	if len(v.SigParams.Headers) == 0 {
+		v.SigParams.Headers = HeaderList{"date"}
 	}
 
 	if len(v.Signature) == 0 {
 		return errors.New("Missing signature")
 	}
 
-	if len(sigParams.KeyID) == 0 {
+	if len(v.SigParams.KeyID) == 0 {
 		return errors.New("Missing keyId")
 	}
 
-	if sigParams.Algorithm == nil {
+	if v.SigParams.Algorithm == nil {
 		return errors.New("Missing algorithm")
 	}
 
