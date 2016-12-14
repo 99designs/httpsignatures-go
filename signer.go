@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"net/http"
 	"strings"
-	"time"
 )
 
 const (
@@ -12,20 +11,6 @@ const (
 	HeaderAuthorization = "Authorization"
 	RequestTarget       = "(request-target)"
 	authScheme          = "Signature "
-)
-
-var (
-	// DefaultSha1Signer will sign requests with the url and date using the SHA1 algorithm.
-	// Users are encouraged to create their own signer with the headers they require.
-	DefaultSha1Signer = NewSigner(AlgorithmHmacSha1, RequestTarget, "date")
-
-	// DefaultSha256Signer will sign requests with the url and date using the SHA256 algorithm.
-	// Users are encouraged to create their own signer with the headers they require.
-	DefaultSha256Signer = NewSigner(AlgorithmHmacSha256, RequestTarget, "date")
-
-	// DefaultEd25519Signer will sign requests with the url and dat using the Ed25519 algorithm.
-	// Users are encouraged to create their own signer with the header they require.
-	DefaultEd25519Signer = NewSigner(AlgorithmEd25519, RequestTarget, "date")
 )
 
 type Signer struct {
@@ -49,7 +34,7 @@ func NewSigner(algorithm *Algorithm, hdrs ...string) *Signer {
 
 // SignRequest adds a http signature to the Signature: HTTP Header
 func (s Signer) SignRequest(id, key string, r *http.Request) error {
-	signature, err := s.createSignature(id, key, r)
+	signature, err := s.createHTTPSignatureString(id, key, r)
 	if err != nil {
 		return err
 	}
@@ -61,7 +46,7 @@ func (s Signer) SignRequest(id, key string, r *http.Request) error {
 
 // AuthRequest adds a http signature to the Authorization: HTTP Header
 func (s Signer) AuthRequest(id, key string, r *http.Request) error {
-	signature, err := s.createSignature(id, key, r)
+	signature, err := s.createHTTPSignatureString(id, key, r)
 	if err != nil {
 		return err
 	}
@@ -71,11 +56,7 @@ func (s Signer) AuthRequest(id, key string, r *http.Request) error {
 	return nil
 }
 
-func (s Signer) createSignature(id, keyB64 string, r *http.Request) (string, error) {
-	if r.Header.Get("date") == "" {
-		r.Header.Set("date", time.Now().UTC().Format(time.RFC1123))
-	}
-
+func (s Signer) createHTTPSignatureString(id, keyB64 string, r *http.Request) (string, error) {
 	sig := &SignatureParameters{
 		KeyID:     id,
 		Algorithm: s.algorithm,
@@ -89,8 +70,8 @@ func (s Signer) createSignature(id, keyB64 string, r *http.Request) (string, err
 	return sig.HTTPSignatureString(signature), nil
 }
 
-func (a SignatureParameters) CalculateSignature(keyB64 string, r *http.Request) (string, error) {
-	signingString, err := a.Headers.signingString(r)
+func (s SignatureParameters) CalculateSignature(keyB64 string, r *http.Request) (string, error) {
+	signingString, err := s.Headers.SigningString(r)
 	if err != nil {
 		return "", err
 	}
@@ -99,7 +80,8 @@ func (a SignatureParameters) CalculateSignature(keyB64 string, r *http.Request) 
 	if err != nil {
 		return "", err
 	}
-	hash, err := a.Algorithm.Sign(&byteKey, []byte(signingString))
+
+	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
 	if err != nil {
 		return "", err
 	}

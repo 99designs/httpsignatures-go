@@ -9,7 +9,7 @@ import (
 
 // Verify verifies this signature for the given base64 encodedkey
 func (s SignatureParameters) Verify(keyBase64 string, r *http.Request) (bool, error) {
-	signingString, err := s.Headers.signingString(r)
+	signingString, err := s.Headers.SigningString(r)
 	if err != nil {
 		return false, err
 	}

@@ -69,7 +69,7 @@ func TestConfigParserMissingKeyIdShouldFail(t *testing.T) {
 
 func TestConfigParserMissingDateHeader(t *testing.T) {
 	var s SignatureParameters
-	err := s.FromConfig("Test", "hmac-sha256", "(request-target) host")
+	err := s.FromConfig("Test", "hmac-sha256", "(request-target)", "host")
 	assert.Nil(t, err)
 	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}}
 	assert.Equal(t, sigParam, s)

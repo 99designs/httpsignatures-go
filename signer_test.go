@@ -7,6 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	// DefaultSha1Signer will sign requests with date using the SHA1 algorithm.
+	// Users are encouraged to create their own signer with the headers they require.
+	DefaultSha1Signer = NewSigner(AlgorithmHmacSha1)
+
+	// DefaultSha256Signer will sign requests with date using the SHA256 algorithm.
+	// Users are encouraged to create their own signer with the headers they require.
+	DefaultSha256Signer = NewSigner(AlgorithmHmacSha256)
+)
+
 const (
 	testSignature = `keyId="Test",algorithm="hmac-sha256",signature="QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI="`
 	testHash      = `QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI=`
@@ -31,7 +41,7 @@ func TestSignSha1(t *testing.T) {
 
 	assert.Equal(t, testKeyID, s.KeyID)
 	assert.Equal(t, DefaultSha1Signer.algorithm, s.Algorithm)
-	assert.Equal(t, DefaultSha1Signer.headers, s.Headers)
+	assert.Equal(t, HeaderList{"date": "Thu, 05 Jan 2012 21:31:40 GMT"}, s.Headers)
 
 	assert.Equal(t,
 		"RIdBXxLb6gWsu3bZtq3rQWSR1nk=",
@@ -55,7 +65,7 @@ func TestSignSha256(t *testing.T) {
 
 	assert.Equal(t, testKeyID, s.KeyID)
 	assert.Equal(t, DefaultSha256Signer.algorithm, s.Algorithm)
-	assert.Equal(t, DefaultSha256Signer.headers, s.Headers)
+	assert.Equal(t, HeaderList{"date": "Thu, 05 Jan 2012 21:31:40 GMT"}, s.Headers)
 
 	assert.Equal(t,
 		"mIX1nFtRDhvv8HIUSNpE3NQZZ6EIY98ObNkJM+Oq7AU=",
