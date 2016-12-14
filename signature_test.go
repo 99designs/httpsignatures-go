@@ -57,19 +57,19 @@ func TestRequestParserInvalidKeyShouldBeIgnored(t *testing.T) {
 // Test Signature String Config Parser
 func TestConfigParserMissingAlgorithmShouldFail(t *testing.T) {
 	var s SignatureParameters
-	err := s.FromConfig("Test", "", "")
+	err := s.FromConfig("Test", "", nil)
 	assert.Equal(t, "Missing algorithm", err.Error())
 }
 
 func TestConfigParserMissingKeyIdShouldFail(t *testing.T) {
 	var s SignatureParameters
-	err := s.FromConfig("", "hmac-sha256", "")
+	err := s.FromConfig("", "hmac-sha256", nil)
 	assert.Equal(t, "Missing keyId", err.Error())
 }
 
 func TestConfigParserMissingDateHeader(t *testing.T) {
 	var s SignatureParameters
-	err := s.FromConfig("Test", "hmac-sha256", "(request-target)", "host")
+	err := s.FromConfig("Test", "hmac-sha256", []string{"(request-target)", "host"})
 	assert.Nil(t, err)
 	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}}
 	assert.Equal(t, sigParam, s)

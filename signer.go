@@ -3,7 +3,6 @@ package httpsignatures
 import (
 	"encoding/base64"
 	"net/http"
-	"strings"
 )
 
 const (
@@ -14,56 +13,49 @@ const (
 )
 
 type Signer struct {
-	algorithm *Algorithm
-	headers   HeaderList
+	keyId     string
+	keyLookup func(keyId string) string
+	algorithm string
+	headers   []string
 }
 
 // NewSigner adds an algorithm to the signer algorithms
-func NewSigner(algorithm *Algorithm, hdrs ...string) *Signer {
-	hl := HeaderList{}
-
-	for _, header := range hdrs {
-		hl[strings.ToLower(header)] = ""
-	}
-
+func NewSigner(keyId string, keyLookup func(keyId string) string, algorithm string, headers ...string) *Signer {
 	return &Signer{
+		keyId:     keyId,
+		keyLookup: keyLookup,
 		algorithm: algorithm,
-		headers:   hl,
+		headers:   headers,
 	}
 }
 
 // SignRequest adds a http signature to the Signature: HTTP Header
-func (s Signer) SignRequest(id, key string, r *http.Request) error {
-	signature, err := s.createHTTPSignatureString(id, key, r)
+func (s Signer) SignRequest(r *http.Request) error {
+	signature, err := s.createHTTPSignatureString(r)
 	if err != nil {
 		return err
 	}
 
 	r.Header.Add(HeaderSignature, signature)
-
 	return nil
 }
 
 // AuthRequest adds a http signature to the Authorization: HTTP Header
-func (s Signer) AuthRequest(id, key string, r *http.Request) error {
-	signature, err := s.createHTTPSignatureString(id, key, r)
+func (s Signer) AuthRequest(r *http.Request) error {
+	signature, err := s.createHTTPSignatureString(r)
 	if err != nil {
 		return err
 	}
 
 	r.Header.Add(HeaderAuthorization, authScheme+signature)
-
 	return nil
 }
 
-func (s Signer) createHTTPSignatureString(id, keyB64 string, r *http.Request) (string, error) {
-	sig := &SignatureParameters{
-		KeyID:     id,
-		Algorithm: s.algorithm,
-		Headers:   s.headers,
-	}
+func (s Signer) createHTTPSignatureString(r *http.Request) (string, error) {
+	sig := SignatureParameters{}
+	sig.FromConfig(s.keyId, s.algorithm, s.headers)
 
-	signature, err := sig.CalculateSignature(keyB64, r)
+	signature, err := sig.CalculateSignature(s.keyLookup(s.keyId), r)
 	if err != nil {
 		return "", err
 	}

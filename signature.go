@@ -65,7 +65,7 @@ func (s *SignatureParameters) LoadHeaders(r *http.Request) error {
 
 // FromConfig takes the string configuration and fills the
 // SignatureParameters struct
-func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers ...string) error {
+func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers []string) error {
 	if len(keyId) == 0 {
 		return errors.New("Missing keyId")
 	}
