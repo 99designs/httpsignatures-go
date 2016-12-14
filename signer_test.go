@@ -7,6 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	testSignature = `keyId="Test",algorithm="hmac-sha256",signature="QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI="`
+	testHash      = `QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI=`
+	testKey       = "U29tZXRoaW5nUmFuZG9t"
+	testDate      = "Thu, 05 Jan 2012 21:31:40 GMT"
+	testKeyID     = "Test"
+)
+
 func TestSignSha1(t *testing.T) {
 	r := &http.Request{
 		Header: http.Header{
@@ -17,17 +25,17 @@ func TestSignSha1(t *testing.T) {
 	err := DefaultSha1Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	var v VerificationParameters
-	err = v.FromRequest(r)
+	var s SignatureParameters
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.Equal(t, testKeyID, v.SigParams.KeyID)
-	assert.Equal(t, DefaultSha1Signer.algorithm, v.SigParams.Algorithm)
-	assert.Equal(t, DefaultSha1Signer.headers, v.SigParams.Headers)
+	assert.Equal(t, testKeyID, s.KeyID)
+	assert.Equal(t, DefaultSha1Signer.algorithm, s.Algorithm)
+	assert.Equal(t, DefaultSha1Signer.headers, s.Headers)
 
 	assert.Equal(t,
 		"RIdBXxLb6gWsu3bZtq3rQWSR1nk=",
-		v.Signature,
+		s.Signature,
 	)
 }
 
@@ -41,17 +49,17 @@ func TestSignSha256(t *testing.T) {
 	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	var v VerificationParameters
-	err = v.FromRequest(r)
+	var s SignatureParameters
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.Equal(t, testKeyID, v.SigParams.KeyID)
-	assert.Equal(t, DefaultSha256Signer.algorithm, v.SigParams.Algorithm)
-	assert.Equal(t, DefaultSha256Signer.headers, v.SigParams.Headers)
+	assert.Equal(t, testKeyID, s.KeyID)
+	assert.Equal(t, DefaultSha256Signer.algorithm, s.Algorithm)
+	assert.Equal(t, DefaultSha256Signer.headers, s.Headers)
 
 	assert.Equal(t,
 		"mIX1nFtRDhvv8HIUSNpE3NQZZ6EIY98ObNkJM+Oq7AU=",
-		v.Signature,
+		s.Signature,
 	)
 }
 
@@ -99,3 +107,75 @@ func TestSignWithMissingHeader(t *testing.T) {
 	err := s.SignRequest(testKeyID, testKey, r)
 	assert.Equal(t, "Missing required header 'foo'", err.Error())
 }
+
+// Test
+// func TestCreateSignatureWithNoSignature(t *testing.T) {
+// 	r := http.Request{
+// 		Header: http.Header{
+// 			"Date": []string{testDate},
+// 		},
+// 	}
+
+// 	var v VerificationParameters
+// 	err := v.FromRequest(&r)
+// 	assert.Equal(t, ErrorNoSignatureHeader, err)
+// 	sigParam := SignatureParameters{Headers: HeaderList{"date": testDate}}
+// 	assert.Equal(t, VerificationParameters{SigParams: &sigParam, Signature: ""}, v)
+// 	assert.Equal(t, SignatureParameters{}, v)
+// }
+
+// func TestValidRequestIsValid(t *testing.T) {
+// 	r := &http.Request{
+// 		Header: http.Header{
+// 			"Date": []string{testDate},
+// 		},
+// 	}
+// 	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
+// 	assert.Nil(t, err)
+
+// 	var s SignatureParameters
+// 	err = s.FromRequest(r)
+// 	assert.Nil(t, err)
+
+// 	res, err := s.Verify(testKey, r)
+// 	assert.True(t, res)
+// 	assert.Nil(t, err)
+// }
+
+// func TestNotValidIfRequestHeadersChange(t *testing.T) {
+// 	r := &http.Request{
+// 		Header: http.Header{
+// 			"Date": []string{testDate},
+// 		},
+// 	}
+// 	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
+// 	assert.Nil(t, err)
+
+// 	r.Header.Set("Date", "Thu, 05 Jan 2012 21:31:41 GMT")
+// 	var s SignatureParameters
+// 	err = s.FromRequest(r)
+// 	assert.Nil(t, err)
+
+// 	res, err := s.Verify(testKey, r)
+// 	assert.False(t, res)
+// 	assert.Nil(t, err)
+// }
+
+// func TestNotValidIfRequestIsMissingDate(t *testing.T) {
+// 	r := &http.Request{
+// 		Header: http.Header{},
+// 	}
+
+// 	signer := Signer{AlgorithmHmacSha1, HeaderList{RequestTarget}}
+
+// 	err := signer.SignRequest(testKeyID, testKey, r)
+// 	assert.Nil(t, err)
+
+// 	var signature SignatureParameters
+// 	err = signature.FromRequest(r)
+// 	assert.Nil(t, err)
+
+// 	res, err := signature.Verify(testKey, r)
+// 	assert.False(t, res)
+// 	assert.EqualError(t, err, "No Date Header Supplied")
+// }

@@ -1,87 +1,76 @@
 package httpsignatures
 
-// import (
-// 	"github.com/stretchr/testify/assert"
-// 	"net/http"
-// 	"testing"
-// )
-
-const (
-	testSignature = `keyId="Test",algorithm="hmac-sha256",signature="QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI="`
-	testHash      = `QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI=`
-	testKey       = "U29tZXRoaW5nUmFuZG9t"
-	testDate      = "Thu, 05 Jan 2012 21:31:40 GMT"
-	testKeyID     = "Test"
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
-// Test
-// func TestCreateSignatureWithNoSignature(t *testing.T) {
-// 	r := http.Request{
-// 		Header: http.Header{
-// 			"Date": []string{testDate},
-// 		},
-// 	}
+// Test Signature String From Request Parser
+func TestRequestParserMissingSignatureShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromString(`keyId="Test",algorithm="hmac-sha256"`)
+	assert.Equal(t, "Missing signature", err.Error())
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}}
+	assert.Equal(t, sigParam, s)
+}
 
-// 	var v VerificationParameters
-// 	err := v.FromRequest(&r)
-// 	assert.Equal(t, ErrorNoSignatureHeader, err)
-// 	sigParam := SignatureParameters{Headers: HeaderList{"date": testDate}}
-// 	assert.Equal(t, VerificationParameters{SigParams: &sigParam, Signature: ""}, v)
-// 	assert.Equal(t, SignatureParameters{}, v)
-// }
+func TestRequestParserMissingAlgorithmShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromString(`keyId="Test",signature="fffff"`)
+	assert.Equal(t, "Missing algorithm", err.Error())
+	sigParam := SignatureParameters{KeyID: "Test", Headers: HeaderList{"date": ""}, Signature: "fffff"}
+	assert.Equal(t, sigParam, s)
+}
 
-// func TestValidRequestIsValid(t *testing.T) {
-// 	r := &http.Request{
-// 		Header: http.Header{
-// 			"Date": []string{testDate},
-// 		},
-// 	}
-// 	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
-// 	assert.Nil(t, err)
+func TestRequestParserMissingKeyIdShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromString(`algorithm="hmac-sha256",signature="fffff"`)
+	assert.Equal(t, "Missing keyId", err.Error())
+	sigParam := SignatureParameters{Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}, Signature: "fffff"}
+	assert.Equal(t, sigParam, s)
+}
 
-// 	var s SignatureParameters
-// 	err = s.FromRequest(r)
-// 	assert.Nil(t, err)
+func TestRequestParserDualHeaderShouldPickLastOne(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",signature="abcde"`)
+	assert.Nil(t, err)
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}, Signature: "abcde"}
+	assert.Equal(t, sigParam, s)
+}
 
-// 	res, err := s.Verify(testKey, r)
-// 	assert.True(t, res)
-// 	assert.Nil(t, err)
-// }
+func TestRequestParserMissingDateHeader(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",headers="(request-target) host"`)
+	assert.Nil(t, err)
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}, Signature: "fffff"}
+	assert.Equal(t, sigParam, s)
+}
 
-// func TestNotValidIfRequestHeadersChange(t *testing.T) {
-// 	r := &http.Request{
-// 		Header: http.Header{
-// 			"Date": []string{testDate},
-// 		},
-// 	}
-// 	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
-// 	assert.Nil(t, err)
+func TestRequestParserInvalidKeyShouldBeIgnored(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromString(`keyId="Test",algorithm="hmac-sha256",garbage="bob",signature="fffff"`)
+	assert.Nil(t, err)
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}, Signature: "fffff"}
+	assert.Equal(t, sigParam, s)
+}
 
-// 	r.Header.Set("Date", "Thu, 05 Jan 2012 21:31:41 GMT")
-// 	var s SignatureParameters
-// 	err = s.FromRequest(r)
-// 	assert.Nil(t, err)
+// Test Signature String Config Parser
+func TestConfigParserMissingAlgorithmShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("Test", "", "")
+	assert.Equal(t, "Missing algorithm", err.Error())
+}
 
-// 	res, err := s.Verify(testKey, r)
-// 	assert.False(t, res)
-// 	assert.Nil(t, err)
-// }
+func TestConfigParserMissingKeyIdShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("", "hmac-sha256", "")
+	assert.Equal(t, "Missing keyId", err.Error())
+}
 
-// func TestNotValidIfRequestIsMissingDate(t *testing.T) {
-// 	r := &http.Request{
-// 		Header: http.Header{},
-// 	}
-
-// 	signer := Signer{AlgorithmHmacSha1, HeaderList{RequestTarget}}
-
-// 	err := signer.SignRequest(testKeyID, testKey, r)
-// 	assert.Nil(t, err)
-
-// 	var signature SignatureParameters
-// 	err = signature.FromRequest(r)
-// 	assert.Nil(t, err)
-
-// 	res, err := signature.Verify(testKey, r)
-// 	assert.False(t, res)
-// 	assert.EqualError(t, err, "No Date Header Supplied")
-// }
+func TestConfigParserMissingDateHeader(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("Test", "hmac-sha256", "(request-target) host")
+	assert.Nil(t, err)
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}}
+	assert.Equal(t, sigParam, s)
+}
