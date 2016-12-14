@@ -3,6 +3,7 @@
 package httpsignatures
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -25,7 +26,7 @@ type SignatureParameters struct {
 
 // FromRequest takes the signature string from the HTTP-Request
 // both Signature and Authorization http headers are supported.
-func (s *SignatureParameters) FromRequest(r *http.Request) error {
+func (s *SignatureParameters) fromRequest(r *http.Request) error {
 	var httpSignatureString string
 	if sig, ok := r.Header[HeaderSignature]; ok {
 		httpSignatureString = sig[0]
@@ -36,15 +37,15 @@ func (s *SignatureParameters) FromRequest(r *http.Request) error {
 			return ErrorNoSignatureHeader
 		}
 	}
-	err := s.FromString(httpSignatureString)
+	err := s.fromString(httpSignatureString)
 	if err != nil {
 		return err
 	}
-	s.LoadHeaders(r)
+	s.loadHeaders(r)
 	return nil
 }
 
-func (s *SignatureParameters) LoadHeaders(r *http.Request) error {
+func (s *SignatureParameters) loadHeaders(r *http.Request) error {
 	for header := range s.Headers {
 		if header == RequestTarget {
 			if tl, err := requestTargetLine(r); err == nil {
@@ -65,7 +66,7 @@ func (s *SignatureParameters) LoadHeaders(r *http.Request) error {
 
 // FromConfig takes the string configuration and fills the
 // SignatureParameters struct
-func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers []string) error {
+func (s *SignatureParameters) fromConfig(keyId string, algorithm string, headers []string) error {
 	if len(keyId) == 0 {
 		return errors.New("Missing keyId")
 	}
@@ -94,7 +95,7 @@ func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers
 
 // FromString creates a new Signature from its encoded form,
 // eg `keyId="a",algorithm="b",headers="c",signature="d"`
-func (s *SignatureParameters) FromString(in string) error {
+func (s *SignatureParameters) fromString(in string) error {
 	var key string
 	var value string
 	*s = SignatureParameters{}
@@ -104,7 +105,7 @@ func (s *SignatureParameters) FromString(in string) error {
 		value = m[2]
 
 		if key == "keyId" {
-			(*s).KeyID = value
+			s.KeyID = value
 		} else if key == "algorithm" {
 			alg, err := algorithmFromString(value)
 			if err != nil {
@@ -112,7 +113,7 @@ func (s *SignatureParameters) FromString(in string) error {
 			}
 			s.Algorithm = alg
 		} else if key == "headers" {
-			s.Headers.FromString(value)
+			s.Headers.fromString(value)
 		} else if key == "signature" {
 			s.Signature = value
 		}
@@ -139,7 +140,7 @@ func (s *SignatureParameters) FromString(in string) error {
 }
 
 // String returns the encoded form of the Signature
-func (s SignatureParameters) HTTPSignatureString(signature string) string {
+func (s SignatureParameters) hTTPSignatureString(signature string) string {
 	str := fmt.Sprintf(
 		`keyId="%s",algorithm="%s"`,
 		s.KeyID,
@@ -147,7 +148,7 @@ func (s SignatureParameters) HTTPSignatureString(signature string) string {
 	)
 
 	if len(s.Headers) > 0 {
-		str += fmt.Sprintf(`,headers="%s"`, s.Headers.ToString())
+		str += fmt.Sprintf(`,headers="%s"`, s.Headers.toString())
 	}
 
 	str += fmt.Sprintf(`,signature="%s"`, signature)
@@ -155,11 +156,44 @@ func (s SignatureParameters) HTTPSignatureString(signature string) string {
 	return str
 }
 
+func (s SignatureParameters) calculateSignature(keyB64 string, signingString string) (string, error) {
+	byteKey, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil {
+		return "", err
+	}
+
+	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(*hash), err
+}
+
+// Verify verifies this signature for the given base64 encodedkey
+func (s SignatureParameters) Verify(keyBase64 string, signingString string) (bool, error) {
+	byteKey, err := base64.StdEncoding.DecodeString(keyBase64)
+	if err != nil {
+		return false, err
+	}
+
+	byteSignature, err := base64.StdEncoding.DecodeString(s.Signature)
+	if err != nil {
+		return false, err
+	}
+	result, err := s.Algorithm.Verify(&byteKey, []byte(signingString), &byteSignature)
+	if err != nil {
+		return false, err
+	}
+
+	return result, nil
+}
+
 // HeaderList contains headers
 type HeaderList map[string]string
 
 // FromString constructs a headerlist from the 'headers' string
-func (h *HeaderList) FromString(list string) {
+func (h *HeaderList) fromString(list string) {
 	*h = HeaderList{}
 	list = strings.TrimSpace(list)
 	headers := strings.Split(strings.ToLower(string(list)), " ")
@@ -169,7 +203,7 @@ func (h *HeaderList) FromString(list string) {
 	}
 }
 
-func (h HeaderList) ToString() string {
+func (h HeaderList) toString() string {
 	list := ""
 	for header := range h {
 		list += " " + strings.ToLower(header)
@@ -177,7 +211,7 @@ func (h HeaderList) ToString() string {
 	return list
 }
 
-func (h HeaderList) SigningString(req *http.Request) (string, error) {
+func (h HeaderList) signingString(req *http.Request) (string, error) {
 	lines := []string{}
 
 	for header := range h {

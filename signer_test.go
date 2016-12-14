@@ -40,7 +40,7 @@ func TestSignSha1(t *testing.T) {
 	assert.Nil(t, err)
 
 	var s SignatureParameters
-	err = s.FromRequest(r)
+	err = s.fromRequest(r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, testKeyID, s.KeyID)
@@ -64,7 +64,7 @@ func TestSignSha256(t *testing.T) {
 	assert.Nil(t, err)
 
 	var s SignatureParameters
-	err = s.FromRequest(r)
+	err = s.fromRequest(r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, testKeyID, s.KeyID)
@@ -190,4 +190,45 @@ func TestSignWithMissingHeader(t *testing.T) {
 // 	res, err := signature.Verify(testKey, r)
 // 	assert.False(t, res)
 // 	assert.EqualError(t, err, "No Date Header Supplied")
+// }
+
+// func TestVerifySignatureFromAuthorizationHeader(t *testing.T) {
+// 	r := &http.Request{
+// 		Header: http.Header{
+// 			"Date":              []string{testDate},
+// 			HeaderAuthorization: []string{authScheme + testSignature},
+// 		},
+// 	}
+
+// 	var s SignatureParameters
+// 	err := s.fromRequest(r)
+// 	assert.Nil(t, err)
+// 	assert.Equal(t, "Test", s.KeyID)
+// 	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
+// 	assert.Equal(t, testHash, s.Signature)
+
+// 	valid, err := s.Verify(testKey, r)
+// 	assert.Nil(t, err)
+// 	assert.Equal(t, true, valid)
+// }
+
+// func TestVerifySignatureFromSignatureHeader(t *testing.T) {
+// 	r := http.Request{
+// 		Header: http.Header{
+// 			"Date":          []string{testDate},
+// 			HeaderSignature: []string{testSignature},
+// 		},
+// 	}
+
+// 	var s SignatureParameters
+// 	err := s.fromRequest(&r)
+// 	assert.Nil(t, err)
+
+// 	assert.Equal(t, "Test", s.KeyID)
+// 	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
+// 	assert.Equal(t, testHash, s.Signature)
+
+// 	valid, err := s.Verify(testKey, &r)
+// 	assert.Nil(t, err)
+// 	assert.Equal(t, true, valid)
 // }

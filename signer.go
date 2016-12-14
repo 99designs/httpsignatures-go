@@ -1,7 +1,6 @@
 package httpsignatures
 
 import (
-	"encoding/base64"
 	"net/http"
 )
 
@@ -53,29 +52,33 @@ func (s Signer) AuthRequest(r *http.Request) error {
 
 func (s Signer) createHTTPSignatureString(r *http.Request) (string, error) {
 	sig := SignatureParameters{}
-	sig.FromConfig(s.keyId, s.algorithm, s.headers)
+	if err := sig.fromConfig(s.keyId, s.algorithm, s.headers); err != nil {
+		return "", err
+	}
 
-	signature, err := sig.CalculateSignature(s.keyLookup(s.keyId), r)
+	signingString, err := sig.Headers.signingString(r)
 	if err != nil {
 		return "", err
 	}
-	return sig.HTTPSignatureString(signature), nil
+
+	signature, err := sig.calculateSignature(s.keyLookup(s.keyId), signingString)
+	if err != nil {
+		return "", err
+	}
+	return sig.hTTPSignatureString(signature), nil
 }
 
-func (s SignatureParameters) CalculateSignature(keyB64 string, r *http.Request) (string, error) {
-	signingString, err := s.Headers.SigningString(r)
-	if err != nil {
-		return "", err
+func (s Signer) VerifyRequest(r *http.Request, keyLookup func(keyId string) string) (bool, error) {
+	sig := SignatureParameters{}
+	if err := sig.fromRequest(r); err != nil {
+		return false, err
 	}
 
-	byteKey, err := base64.StdEncoding.DecodeString(keyB64)
+	hList := HeaderList{}
+	signingString, err := hList.signingString(r)
 	if err != nil {
-		return "", err
+		return false, err
 	}
 
-	hash, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(*hash), err
+	return sig.Verify(keyLookup(sig.KeyID), signingString)
 }
