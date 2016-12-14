@@ -55,7 +55,7 @@ func (v *VerificationParameters) FromString(in string) error {
 	}
 
 	if len(v.SigParams.Headers) == 0 {
-		v.SigParams.Headers = HeaderList{"date"}
+		v.SigParams.Headers = HeaderList{"date": ""}
 	}
 
 	if len(v.Signature) == 0 {

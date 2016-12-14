@@ -59,31 +59,42 @@ func (sp SignatureParameters) SignatureString(signature string) string {
 }
 
 // HeaderList contains headers
-type HeaderList []string
+type HeaderList map[string]string
 
 // FromString constructs a headerlist from the 'headers' string
 func (h *HeaderList) FromString(list string) {
-	*h = strings.Split(strings.ToLower(string(list)), " ")
+	if *h == nil {
+		*h = HeaderList{}
+	}
+	list = strings.TrimSpace(list)
+	headers := strings.Split(strings.ToLower(string(list)), " ")
+	for _, header := range headers {
+		// init header map with empty string
+		(*h)[header] = ""
+	}
 }
 
 func (h HeaderList) ToString() string {
-	return strings.ToLower(strings.Join(h, " "))
+	list := ""
+	for header := range h {
+		list += " " + strings.ToLower(header)
+	}
+	return list
 }
 
 func (h HeaderList) hasDate() bool {
-	for _, header := range h {
+	for header := range h {
 		if header == "date" {
 			return true
 		}
 	}
-
 	return false
 }
 
 func (h HeaderList) signingString(req *http.Request) (string, error) {
 	lines := []string{}
 
-	for _, header := range h {
+	for header := range h {
 		if header == RequestTarget {
 			lines = append(lines, requestTargetLine(req))
 		} else {
@@ -103,15 +114,12 @@ func requestTargetLine(req *http.Request) string {
 	if req.URL != nil {
 		url = req.URL.RequestURI()
 	}
-
 	return fmt.Sprintf("%s: %s %s", RequestTarget, strings.ToLower(req.Method), url)
 }
 
 func headerLine(req *http.Request, header string) (string, error) {
-
 	if value := req.Header.Get(header); value != "" {
 		return fmt.Sprintf("%s: %s", header, value), nil
 	}
-
 	return "", fmt.Errorf("Missing required header '%s'", header)
 }

@@ -33,11 +33,11 @@ type Signer struct {
 }
 
 // NewSigner adds an algorithm to the signer algorithms
-func NewSigner(algorithm *Algorithm, headers ...string) *Signer {
+func NewSigner(algorithm *Algorithm, hdrs ...string) *Signer {
 	hl := HeaderList{}
 
-	for _, header := range headers {
-		hl = append(hl, strings.ToLower(header))
+	for _, header := range hdrs {
+		hl[strings.ToLower(header)] = ""
 	}
 
 	return &Signer{
