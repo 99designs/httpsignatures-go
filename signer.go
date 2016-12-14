@@ -1,6 +1,7 @@
 package httpsignatures
 
 import (
+	"encoding/base64"
 	"net/http"
 	"strings"
 	"time"
@@ -85,5 +86,22 @@ func (s Signer) createSignature(id, keyB64 string, r *http.Request) (string, err
 	if err != nil {
 		return "", err
 	}
-	return sig.SignatureString(signature), nil
+	return sig.HTTPSignatureString(signature), nil
+}
+
+func (a SignatureParameters) CalculateSignature(keyB64 string, r *http.Request) (string, error) {
+	signingString, err := a.Headers.signingString(r)
+	if err != nil {
+		return "", err
+	}
+
+	byteKey, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil {
+		return "", err
+	}
+	hash, err := a.Algorithm.Sign(&byteKey, []byte(signingString))
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(*hash), err
 }

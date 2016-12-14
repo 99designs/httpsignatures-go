@@ -3,7 +3,6 @@
 package httpsignatures
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -110,25 +109,8 @@ func (s *SignatureParameters) FromString(in string) error {
 	return nil
 }
 
-func (a SignatureParameters) CalculateSignature(keyB64 string, r *http.Request) (string, error) {
-	signingString, err := a.Headers.signingString(r)
-	if err != nil {
-		return "", err
-	}
-
-	byteKey, err := base64.StdEncoding.DecodeString(keyB64)
-	if err != nil {
-		return "", err
-	}
-	hash, err := a.Algorithm.Sign(&byteKey, []byte(signingString))
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(*hash), err
-}
-
 // String returns the encoded form of the Signature
-func (sp SignatureParameters) SignatureString(signature string) string {
+func (sp SignatureParameters) HTTPSignatureString(signature string) string {
 	str := fmt.Sprintf(
 		`keyId="%s",algorithm="%s"`,
 		sp.KeyID,
@@ -166,15 +148,6 @@ func (h HeaderList) ToString() string {
 		list += " " + strings.ToLower(header)
 	}
 	return list
-}
-
-func (h HeaderList) hasDate() bool {
-	for header := range h {
-		if header == "date" {
-			return true
-		}
-	}
-	return false
 }
 
 func (h HeaderList) signingString(req *http.Request) (string, error) {

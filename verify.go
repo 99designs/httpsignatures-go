@@ -4,7 +4,6 @@ package httpsignatures
 
 import (
 	"encoding/base64"
-	"errors"
 	"net/http"
 )
 
@@ -13,10 +12,6 @@ func (s SignatureParameters) Verify(keyBase64 string, r *http.Request) (bool, er
 	signingString, err := s.Headers.signingString(r)
 	if err != nil {
 		return false, err
-	}
-
-	if !s.Headers.hasDate() {
-		return false, errors.New("No Date Header Supplied")
 	}
 
 	byteKey, err := base64.StdEncoding.DecodeString(keyBase64)
