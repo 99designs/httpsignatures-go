@@ -1,10 +1,11 @@
 package httpsignatures
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
+	"time"
 )
 
 var (
@@ -181,4 +182,23 @@ func TestNotValidIfRequestHeadersChange(t *testing.T) {
 	res, err := s.Verify(testKey)
 	assert.False(t, res)
 	assert.Nil(t, err)
+}
+
+func TestNotValidIfClockSkewExceeded(t *testing.T) {
+	allowedClockSkew := 300
+	duration, err := time.ParseDuration(fmt.Sprintf("-%ds", allowedClockSkew))
+	assert.Nil(t, err)
+	r := &http.Request{
+		Header: http.Header{
+			"Date": []string{time.Now().Add(duration).Format(time.RFC1123)},
+		},
+	}
+	err = DefaultSha256Signer.SignRequest(r)
+	assert.Nil(t, err)
+
+	_, err = VerifyRequest(r, defaultKeyLookup, allowedClockSkew)
+	assert.Nil(t, err)
+
+	_, err = VerifyRequest(r, defaultKeyLookup, allowedClockSkew-1)
+	assert.EqualError(t, err, "Allowed clockskew exceeded")
 }

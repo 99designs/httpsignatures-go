@@ -1,7 +1,9 @@
 package httpsignatures
 
 import (
+	"errors"
 	"net/http"
+	"time"
 )
 
 type Signer struct {
@@ -12,7 +14,8 @@ type Signer struct {
 }
 
 // NewSigner adds an algorithm to the signer algorithms
-func NewSigner(keyId string, keyLookup func(keyId string) string, algorithm string, headers ...string) *Signer {
+func NewSigner(keyId string, keyLookup func(keyId string) string,
+	algorithm string, headers ...string) *Signer {
 	return &Signer{
 		keyId:     keyId,
 		keyLookup: keyLookup,
@@ -61,10 +64,27 @@ func (s Signer) createHTTPSignatureString(r *http.Request) (string, error) {
 	return sig.hTTPSignatureString(signature), nil
 }
 
-func (s Signer) VerifyRequest(r *http.Request, keyLookup func(keyId string) string) (bool, error) {
+// VerifyRequest verifies the signature added to the request and returns true if it is OK
+func VerifyRequest(r *http.Request, keyLookup func(keyId string) string, allowedClockSkew int) (bool, error) {
 	sig := SignatureParameters{}
 	if err := sig.FromRequest(r); err != nil {
 		return false, err
+	}
+
+	if allowedClockSkew > -1 {
+		// check if difference between date and date.Now exceeds allowedClockSkew
+		if date := sig.Headers["date"]; len(date) != 0 {
+			if hdrDate, err := time.Parse(time.RFC1123, date); err == nil {
+				if (int)(time.Since(hdrDate).Seconds()) > (allowedClockSkew) {
+					return false, errors.New("Allowed clockskew exceeded")
+				}
+			} else {
+				return false, err
+			}
+
+		} else {
+			return false, errors.New("Date header is missing for clockSkew comparison")
+		}
 	}
 
 	return sig.Verify(keyLookup(sig.KeyID))

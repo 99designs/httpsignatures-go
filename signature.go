@@ -37,6 +37,7 @@ func (s *SignatureParameters) FromRequest(r *http.Request) error {
 	if err := s.ParseRequest(r); err != nil {
 		return err
 	}
+
 	return nil
 }
 
