@@ -7,31 +7,127 @@ import (
 	"testing"
 )
 
+// Signing
+// Test Signature String Config Parser
+func TestConfigParserMissingAlgorithmShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("Test", "", nil)
+	assert.EqualError(t, err, "No algorithm configured")
+}
+
+func TestConfigParserMissingKeyIdShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("", "hmac-sha256", nil)
+	assert.EqualError(t, err, "No keyID configured")
+}
+
+func TestConfigParserNotRequiredDateHeader(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("Test", "hmac-sha256", []string{"(request-target)", "host"})
+	assert.Nil(t, err) // It's okay to not require the date header for the signature
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}}
+	assert.Equal(t, sigParam, s)
+}
+
+func TestConfigParserMissingDateHeader(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("Test", "hmac-sha256", nil) // the date header will be implicitly required
+	assert.Nil(t, err)
+
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}}
+	assert.Equal(t, sigParam, s)
+
+	r := &http.Request{
+		Header: http.Header{
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+	err = s.ParseRequest(r) // it is not okay to have no date header when required
+	assert.EqualError(t, err, "Missing required header 'date'")
+}
+
 // Verification
 // Test Signature String From Request Parser
 func TestRequestParserMissingSignatureShouldFail(t *testing.T) {
+	const DefaultTestAuthHeader string = `keyId="Test",algorithm="hmac-sha256"`
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
 	var s SignatureParameters
-	err := s.parseSignatureString(`keyId="Test",algorithm="hmac-sha256"`)
+	err := s.FromRequest(r)
 	assert.EqualError(t, err, "Missing signature")
 }
 
 func TestRequestParserMissingAlgorithmShouldFail(t *testing.T) {
+	const DefaultTestAuthHeader string = `keyId="Test",signature="fffff"`
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
 	var s SignatureParameters
-	err := s.parseSignatureString(`keyId="Test",signature="fffff"`)
+	err := s.FromRequest(r)
 	assert.EqualError(t, err, "Missing algorithm")
 }
 
 func TestRequestParserMissingKeyIdShouldFail(t *testing.T) {
+	const DefaultTestAuthHeader string = `algorithm="hmac-sha256",signature="fffff"`
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
 	var s SignatureParameters
-	err := s.parseSignatureString(`algorithm="hmac-sha256",signature="fffff"`)
+	err := s.FromRequest(r)
 	assert.EqualError(t, err, "Missing keyId")
 }
 
 func TestRequestParserDualHeaderShouldPickLastOne(t *testing.T) {
+	const DefaultTestAuthHeader string = `keyId="Test",algorithm="hmac-sha256",signature="fffff",signature="abcde"`
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
 	var s SignatureParameters
-	err := s.parseSignatureString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",signature="abcde"`)
+	err := s.FromRequest(r)
 	assert.Nil(t, err)
-	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}, Signature: "abcde"}
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": testDate}, Signature: "abcde"}
 	assert.Equal(t, sigParam, s)
 }
 
@@ -98,51 +194,6 @@ func TestRequestParserLoadHeaderMissingDateHeader(t *testing.T) {
 
 	var s SignatureParameters
 	err := s.FromRequest(r) // the date header will be implicitly required
-	assert.EqualError(t, err, "Missing required header 'date'")
-}
-
-// Signing
-
-// Test Signature String Config Parser
-func TestConfigParserMissingAlgorithmShouldFail(t *testing.T) {
-	var s SignatureParameters
-	err := s.FromConfig("Test", "", nil)
-	assert.EqualError(t, err, "No algorithm configured")
-}
-
-func TestConfigParserMissingKeyIdShouldFail(t *testing.T) {
-	var s SignatureParameters
-	err := s.FromConfig("", "hmac-sha256", nil)
-	assert.EqualError(t, err, "No keyID configured")
-}
-
-func TestConfigParserNotRequiredDateHeader(t *testing.T) {
-	var s SignatureParameters
-	err := s.FromConfig("Test", "hmac-sha256", []string{"(request-target)", "host"})
-	assert.Nil(t, err) // It's okay to not require the date header for the signature
-	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}}
-	assert.Equal(t, sigParam, s)
-}
-
-func TestConfigParserMissingDateHeader(t *testing.T) {
-	var s SignatureParameters
-	err := s.FromConfig("Test", "hmac-sha256", nil) // the date header will be implicitly required
-	assert.Nil(t, err)
-
-	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}}
-	assert.Equal(t, sigParam, s)
-
-	r := &http.Request{
-		Header: http.Header{
-			"Authorization": []string{DefaultTestAuthHeader},
-		},
-		Method: http.MethodPost,
-		URL: &url.URL{
-			Host: "example.com",
-			Path: "/foo?param=value&pet=dog",
-		},
-	}
-	err = s.ParseRequest(r) // it is not okay to have no date header when required
 	assert.EqualError(t, err, "Missing required header 'date'")
 }
 

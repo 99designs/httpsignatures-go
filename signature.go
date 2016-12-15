@@ -79,19 +79,24 @@ func (s *SignatureParameters) ParseRequest(r *http.Request) error {
 		switch header {
 		case "(request-target)":
 			if tl, err := requestTargetLine(r); err == nil {
-				s.Headers[header] = tl
+				s.Headers[header] = strings.TrimSpace(tl)
 			} else {
 				return err
 			}
 		case "host":
 			if host := r.URL.Host; host != "" {
-				s.Headers[header] = host
+				s.Headers[header] = strings.TrimSpace(host)
 			} else {
 				return errors.New("Request contains no host")
 			}
 		default:
-			if value := r.Header.Get(header); value != "" {
-				s.Headers[header] = value
+			// If there are multiple headers with the same name, add them all.
+			if len(r.Header[http.CanonicalHeaderKey(header)]) > 0 {
+				var trimmedValues []string
+				for _, value := range r.Header[http.CanonicalHeaderKey(header)] {
+					trimmedValues = append(trimmedValues, strings.TrimSpace(value))
+				}
+				s.Headers[header] = strings.Join(trimmedValues, ", ")
 			} else {
 				return fmt.Errorf("Missing required header '%s'", header)
 			}

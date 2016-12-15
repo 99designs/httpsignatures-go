@@ -39,7 +39,7 @@ func (s Signer) AuthRequest(r *http.Request) error {
 		return err
 	}
 
-	r.Header.Add("Authorization", "Signature " + signature)
+	r.Header.Add("Authorization", "Signature "+signature)
 	return nil
 }
 
