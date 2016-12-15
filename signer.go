@@ -4,13 +4,6 @@ import (
 	"net/http"
 )
 
-const (
-	HeaderSignature     = "Signature"
-	HeaderAuthorization = "Authorization"
-	RequestTarget       = "(request-target)"
-	authScheme          = "Signature "
-)
-
 type Signer struct {
 	keyId     string
 	keyLookup func(keyId string) string
@@ -35,7 +28,7 @@ func (s Signer) SignRequest(r *http.Request) error {
 		return err
 	}
 
-	r.Header.Add(HeaderSignature, signature)
+	r.Header.Add("Signature", signature)
 	return nil
 }
 
@@ -46,7 +39,7 @@ func (s Signer) AuthRequest(r *http.Request) error {
 		return err
 	}
 
-	r.Header.Add(HeaderAuthorization, authScheme+signature)
+	r.Header.Add("Authorization", "Signature " + signature)
 	return nil
 }
 

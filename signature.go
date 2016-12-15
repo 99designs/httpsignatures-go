@@ -22,21 +22,50 @@ type SignatureParameters struct {
 // both Signature and Authorization http headers are supported.
 func (s *SignatureParameters) FromRequest(r *http.Request) error {
 	var httpSignatureString string
-	if sig, ok := r.Header[HeaderSignature]; ok {
+	if sig, ok := r.Header["Signature"]; ok {
 		httpSignatureString = sig[0]
 	} else {
-		if h, ok := r.Header[HeaderAuthorization]; ok {
-			httpSignatureString = strings.TrimPrefix(h[0], authScheme)
+		if h, ok := r.Header["Authorization"]; ok {
+			httpSignatureString = strings.TrimPrefix(h[0], "Signature ")
 		} else {
 			return errors.New("No Signature header found in request")
 		}
 	}
-	if err := s.fromSignatureString(httpSignatureString); err != nil {
+	if err := s.parseSignatureString(httpSignatureString); err != nil {
 		return err
 	}
 	if err := s.ParseRequest(r); err != nil {
 		return err
 	}
+	return nil
+}
+
+// FromConfig takes the string configuration and fills the
+// SignatureParameters struct
+func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers []string) error {
+	if len(keyId) == 0 {
+		return errors.New("No keyID configured")
+	}
+	if len(algorithm) == 0 {
+		return errors.New("No algorithm configured")
+	}
+	s.KeyID = keyId
+
+	alg, err := algorithmFromString(algorithm)
+	if err != nil {
+		return err
+	}
+	s.Algorithm = alg
+
+	if len(headers) == 0 {
+		s.Headers = HeaderList{"date": ""}
+	} else {
+		s.Headers = HeaderList{}
+		for _, header := range headers {
+			s.Headers[header] = ""
+		}
+	}
+
 	return nil
 }
 
@@ -71,38 +100,9 @@ func (s *SignatureParameters) ParseRequest(r *http.Request) error {
 	return nil
 }
 
-// FromConfig takes the string configuration and fills the
-// SignatureParameters struct
-func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers []string) error {
-	if len(keyId) == 0 {
-		return errors.New("No keyID configured")
-	}
-	if len(algorithm) == 0 {
-		return errors.New("No algorithm configured")
-	}
-	s.KeyID = keyId
-
-	alg, err := algorithmFromString(algorithm)
-	if err != nil {
-		return err
-	}
-	s.Algorithm = alg
-
-	if len(headers) == 0 {
-		s.Headers = HeaderList{"date": ""}
-	} else {
-		s.Headers = HeaderList{}
-		for _, header := range headers {
-			s.Headers[header] = ""
-		}
-	}
-
-	return nil
-}
-
 // FromString creates a new Signature from its encoded form,
 // eg `keyId="a",algorithm="b",headers="c",signature="d"`
-func (s *SignatureParameters) fromSignatureString(in string) error {
+func (s *SignatureParameters) parseSignatureString(in string) error {
 	var key, value string
 	*s = SignatureParameters{}
 	signatureRegex := regexp.MustCompile(`(\w+)="([^"]*)"`)
@@ -120,7 +120,7 @@ func (s *SignatureParameters) fromSignatureString(in string) error {
 			}
 			s.Algorithm = alg
 		} else if key == "headers" {
-			s.Headers.fromString(value)
+			s.Headers.ParseString(value)
 		} else if key == "signature" {
 			s.Signature = value
 		}
@@ -208,8 +208,8 @@ func (s SignatureParameters) Verify(keyBase64 string) (bool, error) {
 // HeaderList contains headers
 type HeaderList map[string]string
 
-// FromString constructs a headerlist from the 'headers' string
-func (h *HeaderList) fromString(list string) {
+// ParseString constructs a headerlist from the 'headers' string
+func (h *HeaderList) ParseString(list string) {
 	*h = HeaderList{}
 	list = strings.TrimSpace(list)
 	headers := strings.Split(strings.ToLower(string(list)), " ")

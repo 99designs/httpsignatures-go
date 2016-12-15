@@ -11,25 +11,25 @@ import (
 // Test Signature String From Request Parser
 func TestRequestParserMissingSignatureShouldFail(t *testing.T) {
 	var s SignatureParameters
-	err := s.fromSignatureString(`keyId="Test",algorithm="hmac-sha256"`)
+	err := s.parseSignatureString(`keyId="Test",algorithm="hmac-sha256"`)
 	assert.EqualError(t, err, "Missing signature")
 }
 
 func TestRequestParserMissingAlgorithmShouldFail(t *testing.T) {
 	var s SignatureParameters
-	err := s.fromSignatureString(`keyId="Test",signature="fffff"`)
+	err := s.parseSignatureString(`keyId="Test",signature="fffff"`)
 	assert.EqualError(t, err, "Missing algorithm")
 }
 
 func TestRequestParserMissingKeyIdShouldFail(t *testing.T) {
 	var s SignatureParameters
-	err := s.fromSignatureString(`algorithm="hmac-sha256",signature="fffff"`)
+	err := s.parseSignatureString(`algorithm="hmac-sha256",signature="fffff"`)
 	assert.EqualError(t, err, "Missing keyId")
 }
 
 func TestRequestParserDualHeaderShouldPickLastOne(t *testing.T) {
 	var s SignatureParameters
-	err := s.fromSignatureString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",signature="abcde"`)
+	err := s.parseSignatureString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",signature="abcde"`)
 	assert.Nil(t, err)
 	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}, Signature: "abcde"}
 	assert.Equal(t, sigParam, s)
