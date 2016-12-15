@@ -22,11 +22,12 @@ var (
 )
 
 const (
-	testSignature = `keyId="Test",algorithm="hmac-sha256",signature="QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI="`
-	testHash      = `QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI=`
-	testKey       = "U29tZXRoaW5nUmFuZG9t"
-	testDate      = "Thu, 05 Jan 2012 21:31:40 GMT"
-	testKeyID     = "Test"
+	testSignature  = `keyId="Test",algorithm="hmac-sha256",signature="QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI="`
+	testSha256Hash = `QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI=`
+	testSha1Hash   = `06tbjUif0/069JeDM7gWFUOjz04=`
+	testKey        = "U29tZXRoaW5nUmFuZG9t"
+	testDate       = "Thu, 05 Jan 2012 21:31:40 GMT"
+	testKeyID      = "Test"
 )
 
 func TestSignSha1(t *testing.T) {
@@ -40,7 +41,7 @@ func TestSignSha1(t *testing.T) {
 	assert.Nil(t, err)
 
 	var s SignatureParameters
-	err = s.fromRequest(r)
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, testKeyID, s.KeyID)
@@ -64,7 +65,7 @@ func TestSignSha256(t *testing.T) {
 	assert.Nil(t, err)
 
 	var s SignatureParameters
-	err = s.fromRequest(r)
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, testKeyID, s.KeyID)
@@ -119,22 +120,6 @@ func TestSignWithMissingHeader(t *testing.T) {
 	err := s.SignRequest(r)
 	assert.Equal(t, "Missing required header 'foo'", err.Error())
 }
-
-// Test
-// func TestCreateSignatureWithNoSignature(t *testing.T) {
-// 	r := http.Request{
-// 		Header: http.Header{
-// 			"Date": []string{testDate},
-// 		},
-// 	}
-
-// 	var v VerificationParameters
-// 	err := v.FromRequest(&r)
-// 	assert.Equal(t, ErrorNoSignatureHeader, err)
-// 	sigParam := SignatureParameters{Headers: HeaderList{"date": testDate}}
-// 	assert.Equal(t, VerificationParameters{SigParams: &sigParam, Signature: ""}, v)
-// 	assert.Equal(t, SignatureParameters{}, v)
-// }
 
 // func TestValidRequestIsValid(t *testing.T) {
 // 	r := &http.Request{

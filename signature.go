@@ -11,12 +11,6 @@ import (
 	"strings"
 )
 
-var (
-	ErrorNoSignatureHeader = errors.New("No Signature header found in request")
-
-	signatureRegex = regexp.MustCompile(`(\w+)="([^"]*)"`)
-)
-
 type SignatureParameters struct {
 	KeyID     string
 	Algorithm *Algorithm
@@ -26,7 +20,7 @@ type SignatureParameters struct {
 
 // FromRequest takes the signature string from the HTTP-Request
 // both Signature and Authorization http headers are supported.
-func (s *SignatureParameters) fromRequest(r *http.Request) error {
+func (s *SignatureParameters) FromRequest(r *http.Request) error {
 	var httpSignatureString string
 	if sig, ok := r.Header[HeaderSignature]; ok {
 		httpSignatureString = sig[0]
@@ -34,26 +28,39 @@ func (s *SignatureParameters) fromRequest(r *http.Request) error {
 		if h, ok := r.Header[HeaderAuthorization]; ok {
 			httpSignatureString = strings.TrimPrefix(h[0], authScheme)
 		} else {
-			return ErrorNoSignatureHeader
+			return errors.New("No Signature header found in request")
 		}
 	}
-	err := s.fromString(httpSignatureString)
-	if err != nil {
+	if err := s.fromSignatureString(httpSignatureString); err != nil {
 		return err
 	}
-	s.loadHeaders(r)
+	if err := s.ParseRequest(r); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (s *SignatureParameters) loadHeaders(r *http.Request) error {
+// ParseRequest extracts the header fields from the request required
+// by the `headers` parameter in the configuration
+func (s *SignatureParameters) ParseRequest(r *http.Request) error {
+	if len(s.Headers) == 0 {
+		return errors.New("No headers config loaded")
+	}
 	for header := range s.Headers {
-		if header == RequestTarget {
+		switch header {
+		case "(request-target)":
 			if tl, err := requestTargetLine(r); err == nil {
 				s.Headers[header] = tl
 			} else {
-				return fmt.Errorf("Missing required target line '%s'", header)
+				return err
 			}
-		} else {
+		case "host":
+			if host := r.URL.Host; host != "" {
+				s.Headers[header] = host
+			} else {
+				return errors.New("Request contains no host")
+			}
+		default:
 			if value := r.Header.Get(header); value != "" {
 				s.Headers[header] = value
 			} else {
@@ -66,12 +73,12 @@ func (s *SignatureParameters) loadHeaders(r *http.Request) error {
 
 // FromConfig takes the string configuration and fills the
 // SignatureParameters struct
-func (s *SignatureParameters) fromConfig(keyId string, algorithm string, headers []string) error {
+func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers []string) error {
 	if len(keyId) == 0 {
-		return errors.New("Missing keyId")
+		return errors.New("No keyID configured")
 	}
 	if len(algorithm) == 0 {
-		return errors.New("Missing algorithm")
+		return errors.New("No algorithm configured")
 	}
 	s.KeyID = keyId
 
@@ -95,10 +102,10 @@ func (s *SignatureParameters) fromConfig(keyId string, algorithm string, headers
 
 // FromString creates a new Signature from its encoded form,
 // eg `keyId="a",algorithm="b",headers="c",signature="d"`
-func (s *SignatureParameters) fromString(in string) error {
-	var key string
-	var value string
+func (s *SignatureParameters) fromSignatureString(in string) error {
+	var key, value string
 	*s = SignatureParameters{}
+	signatureRegex := regexp.MustCompile(`(\w+)="([^"]*)"`)
 
 	for _, m := range signatureRegex.FindAllStringSubmatch(in, -1) {
 		key = m[1]
@@ -148,7 +155,7 @@ func (s SignatureParameters) hTTPSignatureString(signature string) string {
 	)
 
 	if len(s.Headers) > 0 {
-		str += fmt.Sprintf(`,headers="%s"`, s.Headers.toString())
+		str += fmt.Sprintf(`,headers="%s"`, s.Headers.toHeadersString())
 	}
 
 	str += fmt.Sprintf(`,signature="%s"`, signature)
@@ -156,7 +163,11 @@ func (s SignatureParameters) hTTPSignatureString(signature string) string {
 	return str
 }
 
-func (s SignatureParameters) calculateSignature(keyB64 string, signingString string) (string, error) {
+func (s SignatureParameters) calculateSignature(keyB64 string) (string, error) {
+	signingString, err := s.Headers.signingString()
+	if err != nil {
+		return "", err
+	}
 	byteKey, err := base64.StdEncoding.DecodeString(keyB64)
 	if err != nil {
 		return "", err
@@ -171,7 +182,12 @@ func (s SignatureParameters) calculateSignature(keyB64 string, signingString str
 }
 
 // Verify verifies this signature for the given base64 encodedkey
-func (s SignatureParameters) Verify(keyBase64 string, signingString string) (bool, error) {
+func (s SignatureParameters) Verify(keyBase64 string) (bool, error) {
+	signingString, err := s.Headers.signingString()
+	if err != nil {
+		return false, err
+	}
+
 	byteKey, err := base64.StdEncoding.DecodeString(keyBase64)
 	if err != nil {
 		return false, err
@@ -203,7 +219,8 @@ func (h *HeaderList) fromString(list string) {
 	}
 }
 
-func (h HeaderList) toString() string {
+func (h HeaderList) toHeadersString() string {
+	// todo return strings.Join(h, " ")
 	list := ""
 	for header := range h {
 		list += " " + strings.ToLower(header)
@@ -211,40 +228,28 @@ func (h HeaderList) toString() string {
 	return list
 }
 
-func (h HeaderList) signingString(req *http.Request) (string, error) {
-	lines := []string{}
+func (h HeaderList) signingString() (string, error) {
+	signingList := []string{}
 
-	for header := range h {
-		if header == RequestTarget {
-			reqTarget, err := requestTargetLine(req)
-			if err != nil {
-				return "", err
-			}
-			lines = append(lines, reqTarget)
-		} else {
-			line, err := headerLine(req, header)
-			if err != nil {
-				return "", err
-			}
-			lines = append(lines, line)
-		}
+	for header, value := range h {
+		headerString := fmt.Sprintf("%s: %s", header, value)
+		signingList = append(signingList, headerString)
 	}
 
-	return strings.Join(lines, "\n"), nil
+	return strings.Join(signingList, "\n"), nil
 }
 
 func requestTargetLine(req *http.Request) (string, error) {
-	var url, method string
 	if req.URL == nil {
-		return "", fmt.Errorf("URL not in Request")
+		return "", errors.New("URL not in Request")
 	}
 	if len(req.Method) == 0 {
-		return "", fmt.Errorf("Method not in Request")
+		return "", errors.New("Method not in Request")
 	}
 
-	url = req.URL.RequestURI()
-	method = strings.ToLower(req.Method)
-	return fmt.Sprintf("%s: %s %s", RequestTarget, method, url), nil
+	path := req.URL.Path
+	method := strings.ToLower(req.Method)
+	return fmt.Sprintf("%s %s", method, path), nil
 }
 
 func headerLine(req *http.Request, header string) (string, error) {

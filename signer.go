@@ -52,33 +52,27 @@ func (s Signer) AuthRequest(r *http.Request) error {
 
 func (s Signer) createHTTPSignatureString(r *http.Request) (string, error) {
 	sig := SignatureParameters{}
-	if err := sig.fromConfig(s.keyId, s.algorithm, s.headers); err != nil {
+	if err := sig.FromConfig(s.keyId, s.algorithm, s.headers); err != nil {
 		return "", err
 	}
 
-	signingString, err := sig.Headers.signingString(r)
+	if err := sig.ParseRequest(r); err != nil {
+		return "", err
+	}
+
+	signature, err := sig.calculateSignature(s.keyLookup(s.keyId))
 	if err != nil {
 		return "", err
 	}
 
-	signature, err := sig.calculateSignature(s.keyLookup(s.keyId), signingString)
-	if err != nil {
-		return "", err
-	}
 	return sig.hTTPSignatureString(signature), nil
 }
 
 func (s Signer) VerifyRequest(r *http.Request, keyLookup func(keyId string) string) (bool, error) {
 	sig := SignatureParameters{}
-	if err := sig.fromRequest(r); err != nil {
+	if err := sig.FromRequest(r); err != nil {
 		return false, err
 	}
 
-	hList := HeaderList{}
-	signingString, err := hList.signingString(r)
-	if err != nil {
-		return false, err
-	}
-
-	return sig.Verify(keyLookup(sig.KeyID), signingString)
+	return sig.Verify(keyLookup(sig.KeyID))
 }
