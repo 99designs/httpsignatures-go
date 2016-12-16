@@ -38,6 +38,7 @@ func (s *SignatureParameters) FromRequest(r *http.Request) error {
 		return err
 	}
 
+	// todo: check if all required headers are available
 	return nil
 }
 

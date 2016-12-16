@@ -201,4 +201,23 @@ func TestNotValidIfClockSkewExceeded(t *testing.T) {
 
 	_, err = VerifyRequest(r, defaultKeyLookup, allowedClockSkew-1)
 	assert.EqualError(t, err, "Allowed clockskew exceeded")
+
+	_, err = VerifyRequest(r, defaultKeyLookup, 0)
+	assert.EqualError(t, err, "You probably misconfigured allowedClockSkew, set to -1 to disable")
+}
+
+func TestVerifyRequiredHeaderList(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Date": []string{time.Now().Format(time.RFC1123)},
+		},
+	}
+	err := DefaultSha256Signer.SignRequest(r)
+	assert.Nil(t, err)
+
+	_, err = VerifyRequest(r, defaultKeyLookup, -1, "(request-target)")
+	assert.EqualError(t, err, "Required header not in header list")
+
+	_, err = VerifyRequest(r, defaultKeyLookup, -1, "date")
+	assert.Nil(t, err)
 }

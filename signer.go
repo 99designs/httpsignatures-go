@@ -65,13 +65,23 @@ func (s Signer) createHTTPSignatureString(r *http.Request) (string, error) {
 }
 
 // VerifyRequest verifies the signature added to the request and returns true if it is OK
-func VerifyRequest(r *http.Request, keyLookup func(keyId string) string, allowedClockSkew int) (bool, error) {
+func VerifyRequest(r *http.Request, keyLookup func(keyId string) string, allowedClockSkew int, headers ...string) (bool, error) {
 	sig := SignatureParameters{}
+
 	if err := sig.FromRequest(r); err != nil {
 		return false, err
 	}
 
+	for _, header := range headers {
+		if sig.Headers[header] == "" {
+			return false, errors.New("Required header not in header list")
+		}
+	}
+
 	if allowedClockSkew > -1 {
+		if allowedClockSkew == 0 {
+			return false, errors.New("You probably misconfigured allowedClockSkew, set to -1 to disable")
+		}
 		// check if difference between date and date.Now exceeds allowedClockSkew
 		if date := sig.Headers["date"]; len(date) != 0 {
 			if hdrDate, err := time.Parse(time.RFC1123, date); err == nil {
