@@ -3,7 +3,6 @@
 package httpsignatures
 
 import (
-	"crypto/hmac"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -12,189 +11,264 @@ import (
 	"strings"
 )
 
-const (
-	headerSignature     = "Signature"
-	headerAuthorization = "Authorization"
-
-	RequestTarget = "(request-target)"
-
-	authScheme = "Signature "
-)
-
-var (
-	ErrorNoSignatureHeader = errors.New("No Signature header found in request")
-
-	signatureRegex = regexp.MustCompile(`(\w+)="([^"]*)"`)
-)
-
-// Signature is the hashed key + headers, either from a request or a signer
-type Signature struct {
+type SignatureParameters struct {
 	KeyID     string
 	Algorithm *Algorithm
 	Headers   HeaderList
 	Signature string
 }
 
-// FromRequest creates a new Signature from the Request
+const (
+	HeaderRequestTarget string = "(request-target)"
+	HeaderDate          string = "date"
+	HeaderHost          string = "host"
+)
+
+// FromRequest takes the signature string from the HTTP-Request
 // both Signature and Authorization http headers are supported.
-func FromRequest(r *http.Request) (*Signature, error) {
-	if s, ok := r.Header[headerSignature]; ok {
-		return FromString(s[0])
+func (s *SignatureParameters) FromRequest(r *http.Request) error {
+	var httpSignatureString string
+	if sig, ok := r.Header["Signature"]; ok {
+		httpSignatureString = sig[0]
+	} else {
+		if h, ok := r.Header["Authorization"]; ok {
+			httpSignatureString = strings.TrimPrefix(h[0], "Signature ")
+		} else {
+			return errors.New(ErrorNoSignatureHeaderFoundInRequest)
+		}
 	}
-	if a, ok := r.Header[headerAuthorization]; ok {
-		return FromString(strings.TrimPrefix(a[0], authScheme))
+	if err := s.parseSignatureString(httpSignatureString); err != nil {
+		return err
 	}
-	return nil, ErrorNoSignatureHeader
+	if err := s.ParseRequest(r); err != nil {
+		return err
+	}
+
+	// todo: check if all required headers are available
+	return nil
+}
+
+// FromConfig takes the string configuration and fills the
+// SignatureParameters struct
+func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers []string) error {
+	if len(keyId) == 0 {
+		return errors.New(ErrorNoKeyIDConfigured)
+	}
+	if len(algorithm) == 0 {
+		return errors.New(ErrorNoAlgorithmConfigured)
+	}
+	s.KeyID = keyId
+
+	alg, err := algorithmFromString(algorithm)
+	if err != nil {
+		return err
+	}
+	s.Algorithm = alg
+
+	if len(headers) == 0 {
+		s.Headers = HeaderList{"date": ""}
+	} else {
+		s.Headers = HeaderList{}
+		for _, header := range headers {
+			s.Headers[header] = ""
+		}
+	}
+
+	return nil
+}
+
+// ParseRequest extracts the header fields from the request required
+// by the `headers` parameter in the configuration
+func (s *SignatureParameters) ParseRequest(r *http.Request) error {
+	if len(s.Headers) == 0 {
+		return errors.New(ErrorNoHeadersConfigLoaded)
+	}
+	for header := range s.Headers {
+		switch header {
+		case "(request-target)":
+			if tl, err := requestTargetLine(r); err == nil {
+				s.Headers[header] = strings.TrimSpace(tl)
+			} else {
+				return err
+			}
+		case "host":
+			if host := r.URL.Host; host != "" {
+				s.Headers[header] = strings.TrimSpace(host)
+			} else {
+				return errors.New(ErrorMissingRequiredHeader + " 'host'")
+			}
+		default:
+			// If there are multiple headers with the same name, add them all.
+			if len(r.Header[http.CanonicalHeaderKey(header)]) > 0 {
+				var trimmedValues []string
+				for _, value := range r.Header[http.CanonicalHeaderKey(header)] {
+					trimmedValues = append(trimmedValues, strings.TrimSpace(value))
+				}
+				s.Headers[header] = strings.Join(trimmedValues, ", ")
+			} else {
+				return fmt.Errorf("%s '%s'", ErrorMissingRequiredHeader, header)
+			}
+		}
+	}
+	return nil
 }
 
 // FromString creates a new Signature from its encoded form,
 // eg `keyId="a",algorithm="b",headers="c",signature="d"`
-func FromString(in string) (*Signature, error) {
-	var res Signature = Signature{}
-	var key string
-	var value string
+func (s *SignatureParameters) parseSignatureString(in string) error {
+	var key, value string
+	*s = SignatureParameters{}
+	signatureRegex := regexp.MustCompile(`(\w+)="([^"]*)"`)
 
 	for _, m := range signatureRegex.FindAllStringSubmatch(in, -1) {
 		key = m[1]
 		value = m[2]
 
 		if key == "keyId" {
-			res.KeyID = value
+			s.KeyID = value
 		} else if key == "algorithm" {
 			alg, err := algorithmFromString(value)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			res.Algorithm = alg
+			s.Algorithm = alg
 		} else if key == "headers" {
-			res.Headers = headerListFromString(value)
+			s.Headers.ParseString(value)
 		} else if key == "signature" {
-			res.Signature = value
-		} else {
-			return nil, errors.New(fmt.Sprintf("Unexpected key in signature '%s'", key))
+			s.Signature = value
 		}
+		// ignore unknown parameters
 	}
 
-	if len(res.Signature) == 0 {
-		return nil, errors.New("Missing signature")
+	if len(s.Headers) == 0 {
+		s.Headers = HeaderList{"date": ""}
 	}
 
-	if len(res.KeyID) == 0 {
-		return nil, errors.New("Missing keyId")
+	if len(s.Signature) == 0 {
+		return errors.New(ErrorMissingSignatureParameterSignature)
 	}
 
-	if res.Algorithm == nil {
-		return nil, errors.New("Missing algorithm")
+	if len(s.KeyID) == 0 {
+		return errors.New(ErrorMissingSignatureParameterKeyId)
 	}
 
-	return &res, nil
+	if s.Algorithm == nil {
+		return errors.New(ErrorMissingSignatureParameterAlgorithm)
+	}
+
+	return nil
 }
 
 // String returns the encoded form of the Signature
-func (s Signature) String() string {
+func (s SignatureParameters) hTTPSignatureString(signature string) string {
 	str := fmt.Sprintf(
-		`keyId="%s",algorithm="%s",signature="%s"`,
+		`keyId="%s",algorithm="%s"`,
 		s.KeyID,
-		s.Algorithm.name,
-		s.Signature,
+		s.Algorithm.Name,
 	)
 
 	if len(s.Headers) > 0 {
-		str += fmt.Sprintf(`,headers="%s"`, s.Headers.String())
+		str += fmt.Sprintf(`,headers="%s"`, s.Headers.toHeadersString())
 	}
+
+	str += fmt.Sprintf(`,signature="%s"`, signature)
 
 	return str
 }
 
-func (s Signature) calculateSignature(key string, r *http.Request) (string, error) {
-	hash := hmac.New(s.Algorithm.hash, []byte(key))
-
-	signingString, err := s.Headers.signingString(r)
+func (s SignatureParameters) calculateSignature(keyB64 string) (string, error) {
+	signingString, err := s.Headers.signingString()
+	if err != nil {
+		return "", err
+	}
+	byteKey, err := base64.StdEncoding.DecodeString(keyB64)
 	if err != nil {
 		return "", err
 	}
 
-	hash.Write([]byte(signingString))
-
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
-}
-
-// Sign this signature using the given key
-func (s *Signature) sign(key string, r *http.Request) error {
-	sig, err := s.calculateSignature(key, r)
+	signature, err := s.Algorithm.Sign(&byteKey, []byte(signingString))
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	s.Signature = sig
-	return nil
+	return base64.StdEncoding.EncodeToString(*signature), err
 }
 
-// IsValid validates this signature for the given key
-func (s Signature) IsValid(key string, r *http.Request) bool {
-	if !s.Headers.hasDate() {
-		return false
-	}
-
-	sig, err := s.calculateSignature(key, r)
+// Verify verifies this signature for the given base64 encodedkey
+func (s SignatureParameters) Verify(keyBase64 string) (bool, error) {
+	signingString, err := s.Headers.signingString()
 	if err != nil {
-		return false
-	}
-	return s.Signature == sig
-}
-
-type HeaderList []string
-
-func headerListFromString(list string) HeaderList {
-	return strings.Split(strings.ToLower(string(list)), " ")
-}
-
-func (h HeaderList) String() string {
-	return strings.ToLower(strings.Join(h, " "))
-}
-
-func (h HeaderList) hasDate() bool {
-	for _, header := range h {
-		if header == "date" {
-			return true
-		}
+		return false, err
 	}
 
-	return false
-}
-
-func (h HeaderList) signingString(req *http.Request) (string, error) {
-	lines := []string{}
-
-	for _, header := range h {
-		if header == RequestTarget {
-			lines = append(lines, requestTargetLine(req))
-		} else {
-			line, err := headerLine(req, header)
-			if err != nil {
-				return "", err
-			}
-			lines = append(lines, line)
-		}
+	byteKey, err := base64.StdEncoding.DecodeString(keyBase64)
+	if err != nil {
+		return false, err
 	}
 
-	return strings.Join(lines, "\n"), nil
-}
-
-func requestTargetLine(req *http.Request) string {
-	var url string = ""
-	if req.URL != nil {
-		url = req.URL.RequestURI()
+	byteSignature, err := base64.StdEncoding.DecodeString(s.Signature)
+	if err != nil {
+		return false, err
 	}
 
-	return fmt.Sprintf("%s: %s %s", RequestTarget, strings.ToLower(req.Method), url)
+	result, err := s.Algorithm.Verify(&byteKey, []byte(signingString), &byteSignature)
+	if err != nil {
+		return false, err
+	}
+
+	return result, nil
+}
+
+// HeaderList contains headers
+type HeaderList map[string]string
+
+// ParseString constructs a headerlist from the 'headers' string
+func (h *HeaderList) ParseString(list string) {
+	*h = HeaderList{}
+	list = strings.TrimSpace(list)
+	headers := strings.Split(strings.ToLower(string(list)), " ")
+	for _, header := range headers {
+		// init header map with empty string
+		(*h)[header] = ""
+	}
+}
+
+func (h HeaderList) toHeadersString() string {
+	// todo return strings.Join(h, " ")
+	list := ""
+	for header := range h {
+		list += " " + strings.ToLower(header)
+	}
+	return list
+}
+
+func (h HeaderList) signingString() (string, error) {
+	signingList := []string{}
+
+	for header, value := range h {
+		headerString := fmt.Sprintf("%s: %s", header, value)
+		signingList = append(signingList, headerString)
+	}
+
+	return strings.Join(signingList, "\n"), nil
+}
+
+func requestTargetLine(req *http.Request) (string, error) {
+	if req.URL == nil {
+		return "", errors.New(ErrorURLNotInRequest)
+	}
+	if len(req.Method) == 0 {
+		return "", errors.New(ErrorMethodNotInRequest)
+	}
+
+	path := req.URL.Path
+	method := strings.ToLower(req.Method)
+	return fmt.Sprintf("%s %s", method, path), nil
 }
 
 func headerLine(req *http.Request, header string) (string, error) {
-
 	if value := req.Header.Get(header); value != "" {
 		return fmt.Sprintf("%s: %s", header, value), nil
 	}
-
-	return "", errors.New(fmt.Sprintf("Missing required header '%s'", header))
+	return "", fmt.Errorf("%s '%s'", ErrorMissingRequiredHeader, header)
 }

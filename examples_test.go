@@ -1,18 +1,20 @@
 package httpsignatures_test
 
 import (
+	"errors"
 	"net/http"
 
-	"github.com/99designs/httpsignatures-go"
+	"github.com/mvaneijk/httpsignatures-go"
 )
 
 func Example_signing() {
 	r, _ := http.NewRequest("GET", "http://example.com/some-api", nil)
 
+	signer := httpsignatures.NewSigner(httpsignatures.AlgorithmHmacSha256)
 	// Sign using the 'Signature' header
-	httpsignatures.DefaultSha256Signer.SignRequest("KeyId", "Key", r)
+	signer.SignRequest(r, "keyId", "key")
 	// OR Sign using the 'Authorization' header
-	httpsignatures.DefaultSha256Signer.AuthRequest("KeyId", "Key", r)
+	signer.AuthRequest(r, "keyId", "key")
 
 	http.DefaultClient.Do(r)
 }
@@ -20,34 +22,47 @@ func Example_signing() {
 func Example_customSigning() {
 	signer := httpsignatures.NewSigner(
 		httpsignatures.AlgorithmHmacSha256,
-		httpsignatures.RequestTarget, "date", "content-length",
+		httpsignatures.HeaderRequestTarget,
+		httpsignatures.HeaderDate,
+		"content-length",
 	)
 
 	r, _ := http.NewRequest("GET", "http://example.com/some-api", nil)
 
-	signer.SignRequest("KeyId", "Key", r)
+	signer.SignRequest(r, "keyId", "key")
 
 	http.DefaultClient.Do(r)
 }
 
 func Example_verification() {
 	_ = func(w http.ResponseWriter, r *http.Request) {
-		sig, err := httpsignatures.FromRequest(r)
+
+		keyLookUp := func(keyId string) (string, error) {
+			key := keyId
+			// check if keyId exists
+			if len(keyId) == 0 {
+				return "", errors.New("No keyId supplied")
+			}
+			// add check to see if keyId is allowed to access
+
+			// if all goes well:
+			return key, nil
+		}
+
+		_, err := httpsignatures.VerifyRequest(r, keyLookUp, 300,
+			httpsignatures.HeaderRequestTarget)
+
 		if err != nil {
-			// Probably a malformed header
-			http.Error(w, "Bad Request", http.StatusBadRequest)
+			httpErr, msg := httpsignatures.ErrorToHTTPCode(err.Error())
+			if httpErr == http.StatusInternalServerError {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			} else {
+				http.Error(w, msg, httpErr)
+			}
 			panic(err)
 		}
 
-		// if you have headers that must be signed check
-		// that they are in sig.Headers
-
-		var key string // = lookup using sig.KeyID
-		if !sig.IsValid(key, r) {
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
-
 		// request was signed correctly.
+
 	}
 }

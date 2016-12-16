@@ -1,31 +1,37 @@
 package httpsignatures
 
 import (
-	"crypto/sha1"
-	"crypto/sha256"
 	"errors"
-	"hash"
 )
 
 var (
-	AlgorithmHmacSha256 = &Algorithm{"hmac-sha256", sha256.New}
-	AlgorithmHmacSha1   = &Algorithm{"hmac-sha1", sha1.New}
+	AlgorithmHmacSha1   = "hmac-sha1"
+	AlgorithmHmacSha256 = "hmac-sha256"
+	AlgorithmEd25519    = "ed25519"
 
-	ErrorUnknownAlgorithm = errors.New("Unknown Algorithm")
+	algorithmHmacSha1   = &Algorithm{"hmac-sha1", Hmac1Sign, Hmac1Verify}
+	algorithmHmacSha256 = &Algorithm{"hmac-sha256", Hmac256Sign, Hmac256Verify}
+	algorithmEd25519    = &Algorithm{"ed25519", Ed25519Sign, Ed25519Verify}
+
+	errorUnknownAlgorithm = errors.New("Unknown signature algorithm provided")
 )
 
+// Algorithm exports the main algorithm properties: name, sign, verify
 type Algorithm struct {
-	name string
-	hash func() hash.Hash
+	Name   string
+	Sign   func(privateKey *[]byte, message []byte) (*[]byte, error)
+	Verify func(key *[]byte, message []byte, signature *[]byte) (bool, error)
 }
 
 func algorithmFromString(name string) (*Algorithm, error) {
 	switch name {
-	case AlgorithmHmacSha1.name:
-		return AlgorithmHmacSha1, nil
-	case AlgorithmHmacSha256.name:
-		return AlgorithmHmacSha256, nil
+	case AlgorithmHmacSha1:
+		return algorithmHmacSha1, nil
+	case AlgorithmHmacSha256:
+		return algorithmHmacSha256, nil
+	case AlgorithmEd25519:
+		return algorithmEd25519, nil
 	}
 
-	return nil, ErrorUnknownAlgorithm
+	return nil, errorUnknownAlgorithm
 }

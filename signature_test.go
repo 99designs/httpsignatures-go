@@ -1,137 +1,240 @@
 package httpsignatures
 
 import (
-	"net/http"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"net/http"
+	"net/url"
+	"testing"
 )
 
-const (
-	TEST_SIGNATURE = `keyId="Test",algorithm="hmac-sha256",signature="JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ="`
-	TEST_HASH      = `JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ=`
-	TEST_KEY       = "SomethingRandom"
-	TEST_DATE      = "Thu, 05 Jan 2012 21:31:40 GMT"
-	TEST_KEY_ID    = "Test"
-)
+// Signing
+// Test Signature String Config Parser
+func TestConfigParserMissingAlgorithmShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("Test", "", nil)
+	assert.EqualError(t, err, ErrorNoAlgorithmConfigured)
+}
 
-func TestCreateSignatureFromAuthorizationHeader(t *testing.T) {
-	r := http.Request{
-		Header: http.Header{
-			"Date":              []string{TEST_DATE},
-			headerAuthorization: []string{authScheme + TEST_SIGNATURE},
-		},
-	}
+func TestConfigParserMissingKeyIdShouldFail(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("", "hmac-sha256", nil)
+	assert.EqualError(t, err, ErrorNoKeyIDConfigured)
+}
 
-	s, err := FromRequest(&r)
+func TestConfigParserNotRequiredDateHeader(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("Test", "hmac-sha256", []string{"(request-target)", "host"})
+	assert.Nil(t, err) // It's okay to not require the date header for the signature
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}}
+	assert.Equal(t, sigParam, s)
+}
+
+func TestConfigParserMissingDateHeader(t *testing.T) {
+	var s SignatureParameters
+	err := s.FromConfig("Test", "hmac-sha256", nil) // the date header will be implicitly required
 	assert.Nil(t, err)
 
-	assert.Equal(t, "Test", s.KeyID)
-	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
-	assert.Equal(t, TEST_HASH, s.Signature)
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256, Headers: HeaderList{"date": ""}}
+	assert.Equal(t, sigParam, s)
 
-	assert.Equal(t, s.String(), TEST_SIGNATURE)
-}
-
-func TestCreateSignatureFromSignatureHeaderHeader(t *testing.T) {
-	r := http.Request{
-		Header: http.Header{
-			"Date":          []string{TEST_DATE},
-			headerSignature: []string{TEST_SIGNATURE},
-		},
-	}
-
-	s, err := FromRequest(&r)
-	assert.Nil(t, err)
-
-	assert.Equal(t, "Test", s.KeyID)
-	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
-	assert.Equal(t, TEST_HASH, s.Signature)
-
-	assert.Equal(t, s.String(), TEST_SIGNATURE)
-}
-
-func TestCreateSignatureWithNoSignature(t *testing.T) {
-	r := http.Request{
-		Header: http.Header{
-			"Date": []string{TEST_DATE},
-		},
-	}
-
-	s, err := FromRequest(&r)
-	assert.Equal(t, ErrorNoSignatureHeader, err)
-	assert.Nil(t, s)
-}
-
-func TestCreateWithMissingSignature(t *testing.T) {
-	s, err := FromString(`keyId="Test",algorithm="hmac-sha256"`)
-	assert.Equal(t, "Missing signature", err.Error())
-	assert.Nil(t, s)
-}
-
-func TestCreateWithMissingAlgorithm(t *testing.T) {
-	s, err := FromString(`keyId="Test",signature="fffff"`)
-	assert.Equal(t, "Missing algorithm", err.Error())
-	assert.Nil(t, s)
-}
-
-func TestCreateWithMissingKeyId(t *testing.T) {
-	s, err := FromString(`algorithm="hmac-sha256",signature="fffff"`)
-	assert.Equal(t, "Missing keyId", err.Error())
-	assert.Nil(t, s)
-}
-
-func TestCreateWithInvalidKey(t *testing.T) {
-	s, err := FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",garbage="bob"`)
-	assert.Equal(t, "Unexpected key in signature 'garbage'", err.Error())
-	assert.Nil(t, s)
-}
-
-func TestValidRequestIsValid(t *testing.T) {
 	r := &http.Request{
 		Header: http.Header{
-			"Date": []string{TEST_DATE},
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
 		},
 	}
-	err := DefaultSha256Signer.SignRequest(TEST_KEY_ID, TEST_KEY, r)
-	assert.Nil(t, err)
-
-	sig, err := FromRequest(r)
-	assert.Nil(t, err)
-
-	assert.True(t, sig.IsValid(TEST_KEY, r))
+	err = s.ParseRequest(r) // it is not okay to have no date header when required
+	assert.EqualError(t, err, ErrorMissingRequiredHeader+" 'date'")
 }
 
-func TestNotValidIfRequestHeadersChange(t *testing.T) {
+// Verification
+// Test Signature String From Request Parser
+func TestRequestParserMissingSignatureShouldFail(t *testing.T) {
+	const authHeader string = `keyId="Test",algorithm="hmac-sha256"`
 	r := &http.Request{
 		Header: http.Header{
-			"Date": []string{TEST_DATE},
+			"Date":          []string{testDate},
+			"Authorization": []string{authHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
 		},
 	}
-	err := DefaultSha256Signer.SignRequest(TEST_KEY_ID, TEST_KEY, r)
-	assert.Nil(t, err)
 
-	r.Header.Set("Date", "Thu, 05 Jan 2012 21:31:41 GMT")
-	sig, err := FromRequest(r)
-	assert.Nil(t, err)
-
-	assert.False(t, sig.IsValid(TEST_KEY, r))
+	var s SignatureParameters
+	err := s.FromRequest(r)
+	assert.EqualError(t, err, ErrorMissingSignatureParameterSignature)
 }
 
-func TestNotValidIfRequestIsMissingDate(t *testing.T) {
+func TestRequestParserMissingAlgorithmShouldFail(t *testing.T) {
+	const authHeader string = `keyId="Test",signature="fffff"`
 	r := &http.Request{
 		Header: http.Header{
-			"Date": []string{TEST_DATE},
+			"Date":          []string{testDate},
+			"Authorization": []string{authHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
 		},
 	}
 
-	s := Signer{AlgorithmHmacSha1, HeaderList{RequestTarget}}
+	var s SignatureParameters
+	err := s.FromRequest(r)
+	assert.EqualError(t, err, ErrorMissingSignatureParameterAlgorithm)
+}
 
-	err := s.SignRequest(TEST_KEY_ID, TEST_KEY, r)
+func TestRequestParserMissingKeyIdShouldFail(t *testing.T) {
+	const authHeader string = `algorithm="hmac-sha256",signature="fffff"`
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{authHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
+	var s SignatureParameters
+	err := s.FromRequest(r)
+	assert.EqualError(t, err, ErrorMissingSignatureParameterKeyId)
+}
+
+func TestRequestParserDualHeaderShouldPickLastOne(t *testing.T) {
+	const authHeader string = `keyId="Test",algorithm="hmac-sha256",signature="fffff",signature="abcde"`
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{authHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
+	var s SignatureParameters
+	err := s.FromRequest(r)
 	assert.Nil(t, err)
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256, Headers: HeaderList{"date": testDate}, Signature: "abcde"}
+	assert.Equal(t, sigParam, s)
+}
 
-	sig, err := FromRequest(r)
+func TestRequestParserMissingDateHeader(t *testing.T) {
+	const authHeader string = `keyId="Test",algorithm="hmac-sha256",signature="fffff",headers="(request-target) host"`
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{authHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
+	var s SignatureParameters
+	err := s.FromRequest(r)
 	assert.Nil(t, err)
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256,
+		Headers: HeaderList{"(request-target)": "post /foo?param=value&pet=dog", "host": "example.com"}, Signature: "fffff"}
+	assert.Equal(t, sigParam, s)
+}
 
-	assert.False(t, sig.IsValid(TEST_KEY, r))
+func TestRequestParserInvalidKeyShouldBeIgnored(t *testing.T) {
+	const authHeader string = `Signature keyId="Test",algorithm="hmac-sha256",
+		garbage="bob",signature="fffff"`
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{authHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
+	var s SignatureParameters
+	err := s.FromRequest(r)
+	assert.Nil(t, err)
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256, Headers: HeaderList{"date": testDate}, Signature: "fffff"}
+	assert.Equal(t, sigParam, s)
+}
+
+// todo , change hmac back to RSA from example in http-signatures-draft-05
+const DefaultTestAuthHeader string = `Signature keyId="Test",algorithm="hmac-sha256",
+		signature="ATp0r26dbMIxOopqw0OfABDT7CKMIoENumuruOtarj8n/97Q3htHFYpH8yOSQk3Z5zh8UxUym6FYTb5+
+		A0Nz3NRsXJibnYi7brE/4tx5But9kkFGzG+xpUmimN4c3TMN7OFH//+r8hBf7BT9/GmHDUVZT2JzWGLZES2xDOUuMtA="`
+
+func TestRequestParserLoadHeaderMissingDateHeader(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		Method: http.MethodPost,
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
+	var s SignatureParameters
+	err := s.FromRequest(r) // the date header will be implicitly required
+	assert.EqualError(t, err, ErrorMissingRequiredHeader+" 'date'")
+}
+
+// Test Parse SignatureParameters from Request
+func TestParseRequestWithNoSignatureShouldFail(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Date": []string{testDate},
+		},
+	}
+
+	var s SignatureParameters
+	err := s.FromRequest(r)
+	assert.EqualError(t, err, ErrorNoSignatureHeaderFoundInRequest)
+}
+
+func TestParseRequestWithNoHostShouldFail(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		Method: http.MethodPost,
+	}
+
+	_, err := requestTargetLine(r)
+	assert.EqualError(t, err, ErrorURLNotInRequest)
+}
+
+func TestParseRequestWithNoMethodShouldFail(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Date":          []string{testDate},
+			"Authorization": []string{DefaultTestAuthHeader},
+		},
+		URL: &url.URL{
+			Host: "example.com",
+			Path: "/foo?param=value&pet=dog",
+		},
+	}
+
+	_, err := requestTargetLine(r)
+	assert.EqualError(t, err, ErrorMethodNotInRequest)
 }
