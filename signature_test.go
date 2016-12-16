@@ -25,7 +25,7 @@ func TestConfigParserNotRequiredDateHeader(t *testing.T) {
 	var s SignatureParameters
 	err := s.FromConfig("Test", "hmac-sha256", []string{"(request-target)", "host"})
 	assert.Nil(t, err) // It's okay to not require the date header for the signature
-	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}}
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256, Headers: HeaderList{"(request-target)": "", "host": ""}}
 	assert.Equal(t, sigParam, s)
 }
 
@@ -34,7 +34,7 @@ func TestConfigParserMissingDateHeader(t *testing.T) {
 	err := s.FromConfig("Test", "hmac-sha256", nil) // the date header will be implicitly required
 	assert.Nil(t, err)
 
-	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": ""}}
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256, Headers: HeaderList{"date": ""}}
 	assert.Equal(t, sigParam, s)
 
 	r := &http.Request{
@@ -127,7 +127,7 @@ func TestRequestParserDualHeaderShouldPickLastOne(t *testing.T) {
 	var s SignatureParameters
 	err := s.FromRequest(r)
 	assert.Nil(t, err)
-	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": testDate}, Signature: "abcde"}
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256, Headers: HeaderList{"date": testDate}, Signature: "abcde"}
 	assert.Equal(t, sigParam, s)
 }
 
@@ -148,7 +148,7 @@ func TestRequestParserMissingDateHeader(t *testing.T) {
 	var s SignatureParameters
 	err := s.FromRequest(r)
 	assert.Nil(t, err)
-	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256,
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256,
 		Headers: HeaderList{"(request-target)": "post /foo?param=value&pet=dog", "host": "example.com"}, Signature: "fffff"}
 	assert.Equal(t, sigParam, s)
 }
@@ -171,7 +171,7 @@ func TestRequestParserInvalidKeyShouldBeIgnored(t *testing.T) {
 	var s SignatureParameters
 	err := s.FromRequest(r)
 	assert.Nil(t, err)
-	sigParam := SignatureParameters{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Headers: HeaderList{"date": testDate}, Signature: "fffff"}
+	sigParam := SignatureParameters{KeyID: "Test", Algorithm: algorithmHmacSha256, Headers: HeaderList{"date": testDate}, Signature: "fffff"}
 	assert.Equal(t, sigParam, s)
 }
 

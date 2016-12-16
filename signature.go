@@ -18,6 +18,11 @@ type SignatureParameters struct {
 	Signature string
 }
 
+const (
+	HeaderRequestTarget string = "(request-target)"
+	HeaderDate          string = "date"
+)
+
 // FromRequest takes the signature string from the HTTP-Request
 // both Signature and Authorization http headers are supported.
 func (s *SignatureParameters) FromRequest(r *http.Request) error {

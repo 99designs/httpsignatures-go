@@ -6,36 +6,44 @@ import (
 	"github.com/mvaneijk/httpsignatures-go"
 )
 
+func keyLookup(keyId string) string {
+	return keyId
+}
+
 func Example_signing() {
 	r, _ := http.NewRequest("GET", "http://example.com/some-api", nil)
 
+	signer := httpsignatures.NewSigner("keyId", keyLookup, httpsignatures.AlgorithmHmacSha256)
 	// Sign using the 'Signature' header
-	httpsignatures.DefaultSha256Signer.SignRequest("KeyId", "Key", r)
+	signer.SignRequest(r)
 	// OR Sign using the 'Authorization' header
-	httpsignatures.DefaultSha256Signer.AuthRequest("KeyId", "Key", r)
+	signer.AuthRequest(r)
 
 	http.DefaultClient.Do(r)
 }
 
 func Example_customSigning() {
 	signer := httpsignatures.NewSigner(
+		"keyId",
+		keyLookup,
 		httpsignatures.AlgorithmHmacSha256,
-		httpsignatures.RequestTarget, "date", "content-length",
+		httpsignatures.HeaderRequestTarget,
+		httpsignatures.HeaderDate,
+		"content-length",
 	)
 
 	r, _ := http.NewRequest("GET", "http://example.com/some-api", nil)
 
-	signer.SignRequest("KeyId", "Key", r)
+	signer.SignRequest(r)
 
 	http.DefaultClient.Do(r)
 }
 
 func Example_verification() {
 	_ = func(w http.ResponseWriter, r *http.Request) {
-		authenticator := httpSignatures.NewAuthenticator()
-		authenticator.keyLookup = func (keyId string) string {return keyId} 
 
-		result, err := authenticator.Verify(r)
+		_, err := httpsignatures.VerifyRequest(r, keyLookup, 300,
+			httpsignatures.HeaderRequestTarget)
 
 		if err != nil {
 			// Probably a malformed header
@@ -43,19 +51,7 @@ func Example_verification() {
 			panic(err)
 		}
 
-		// if you have headers that must be signed check
-		// that they are in sig.Headers
-
-		var key string // = lookup using sig.KeyID
-		res, err := sig.Verify(key, r)
-		if !res {
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
-		if err != nil {
-			http.Error(w, "Error", http.StatusInternalServerError)
-		}
-
 		// request was signed correctly.
+
 	}
 }

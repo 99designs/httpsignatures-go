@@ -33,7 +33,7 @@ func getTestAlgorithmDataFromString(name string) (*TestAlgorithmData, error) {
 		return TestHmacSha256, nil
 	}
 
-	return nil, ErrorUnknownAlgorithm
+	return nil, errorUnknownAlgorithm
 }
 
 // Test

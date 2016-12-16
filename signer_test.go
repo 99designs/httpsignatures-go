@@ -49,7 +49,7 @@ func TestSignSha1(t *testing.T) {
 	err = s.FromRequest(r)
 	assert.Nil(t, err)
 	assert.Equal(t, testKeyID, s.KeyID)
-	assert.Equal(t, AlgorithmHmacSha1, s.Algorithm)
+	assert.Equal(t, algorithmHmacSha1, s.Algorithm)
 	assert.Equal(t, HeaderList{"date": "Thu, 05 Jan 2012 21:31:40 GMT"}, s.Headers)
 	assert.Equal(t,
 		"06tbjUif0/069JeDM7gWFUOjz04=",
@@ -73,7 +73,7 @@ func TestSignSha256(t *testing.T) {
 	err = s.FromRequest(r)
 	assert.Nil(t, err)
 	assert.Equal(t, testKeyID, s.KeyID)
-	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
+	assert.Equal(t, algorithmHmacSha256, s.Algorithm)
 	assert.Equal(t, HeaderList{"date": "Thu, 05 Jan 2012 21:31:40 GMT"}, s.Headers)
 	assert.Equal(t,
 		"QgoCZTOayhvFBl1QLXmFOZIVMXC0Dujs5ODsYVruDPI=",
