@@ -6,6 +6,8 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"hash"
+
+	"errors"
 )
 
 const (
@@ -44,5 +46,9 @@ func Verify(privateKey *[]byte, message []byte, hashFunc func() hash.Hash, sig *
 		return false, err
 	}
 
-	return bytes.Equal(*calcSign, *sig), err
+	if bytes.Equal(*calcSign, *sig) {
+		return true, nil
+	} else {
+		return false, errors.New("Signatures do not match")
+	}
 }

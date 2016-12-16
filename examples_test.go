@@ -1,31 +1,26 @@
 package httpsignatures_test
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/mvaneijk/httpsignatures-go"
 )
 
-func keyLookup(keyId string) string {
-	return keyId
-}
-
 func Example_signing() {
 	r, _ := http.NewRequest("GET", "http://example.com/some-api", nil)
 
-	signer := httpsignatures.NewSigner("keyId", keyLookup, httpsignatures.AlgorithmHmacSha256)
+	signer := httpsignatures.NewSigner(httpsignatures.AlgorithmHmacSha256)
 	// Sign using the 'Signature' header
-	signer.SignRequest(r)
+	signer.SignRequest(r, "keyId", "key")
 	// OR Sign using the 'Authorization' header
-	signer.AuthRequest(r)
+	signer.AuthRequest(r, "keyId", "key")
 
 	http.DefaultClient.Do(r)
 }
 
 func Example_customSigning() {
 	signer := httpsignatures.NewSigner(
-		"keyId",
-		keyLookup,
 		httpsignatures.AlgorithmHmacSha256,
 		httpsignatures.HeaderRequestTarget,
 		httpsignatures.HeaderDate,
@@ -34,7 +29,7 @@ func Example_customSigning() {
 
 	r, _ := http.NewRequest("GET", "http://example.com/some-api", nil)
 
-	signer.SignRequest(r)
+	signer.SignRequest(r, "keyId", "key")
 
 	http.DefaultClient.Do(r)
 }
@@ -42,7 +37,19 @@ func Example_customSigning() {
 func Example_verification() {
 	_ = func(w http.ResponseWriter, r *http.Request) {
 
-		_, err := httpsignatures.VerifyRequest(r, keyLookup, 300,
+		keyLookUp := func(keyId string) (string, error) {
+			key := keyId
+			// check if keyId exists
+			if len(keyId) == 0 {
+				return "", errors.New("No keyId supplied")
+			}
+			// add check to see if keyId is allowed to access
+
+			// if all goes well:
+			return key, nil
+		}
+
+		_, err := httpsignatures.VerifyRequest(r, keyLookUp, 300,
 			httpsignatures.HeaderRequestTarget)
 
 		if err != nil {

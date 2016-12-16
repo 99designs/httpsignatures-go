@@ -1,6 +1,8 @@
 package httpsignatures
 
 import (
+	"errors"
+
 	ed25519 "github.com/agl/ed25519"
 )
 
@@ -21,5 +23,9 @@ func Ed25519Verify(publicKey *[]byte, message []byte, signature *[]byte) (bool, 
 	copy(pubKey[:], *publicKey)
 	var sig [ed25519.SignatureSize]byte
 	copy(sig[:], *signature)
-	return ed25519.Verify(&pubKey, message, &sig), nil
+	if ed25519.Verify(&pubKey, message, &sig) {
+		return true, nil
+	} else {
+		return false, errors.New("Signatures do not match")
+	}
 }

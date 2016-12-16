@@ -6,27 +6,22 @@ import (
 	"time"
 )
 
-type Signer struct {
-	keyId     string
-	keyLookup func(keyId string) string
+type signer struct {
 	algorithm string
 	headers   []string
 }
 
 // NewSigner adds an algorithm to the signer algorithms
-func NewSigner(keyId string, keyLookup func(keyId string) string,
-	algorithm string, headers ...string) *Signer {
-	return &Signer{
-		keyId:     keyId,
-		keyLookup: keyLookup,
+func NewSigner(algorithm string, headers ...string) *signer {
+	return &signer{
 		algorithm: algorithm,
 		headers:   headers,
 	}
 }
 
 // SignRequest adds a http signature to the Signature: HTTP Header
-func (s Signer) SignRequest(r *http.Request) error {
-	signature, err := s.createHTTPSignatureString(r)
+func (s signer) SignRequest(r *http.Request, keyID string, keyB64 string) error {
+	signature, err := s.createHTTPSignatureString(r, keyID, keyB64)
 	if err != nil {
 		return err
 	}
@@ -36,8 +31,8 @@ func (s Signer) SignRequest(r *http.Request) error {
 }
 
 // AuthRequest adds a http signature to the Authorization: HTTP Header
-func (s Signer) AuthRequest(r *http.Request) error {
-	signature, err := s.createHTTPSignatureString(r)
+func (s signer) AuthRequest(r *http.Request, keyID string, keyB64 string) error {
+	signature, err := s.createHTTPSignatureString(r, keyID, keyB64)
 	if err != nil {
 		return err
 	}
@@ -46,9 +41,9 @@ func (s Signer) AuthRequest(r *http.Request) error {
 	return nil
 }
 
-func (s Signer) createHTTPSignatureString(r *http.Request) (string, error) {
+func (s signer) createHTTPSignatureString(r *http.Request, keyID string, keyB64 string) (string, error) {
 	sig := SignatureParameters{}
-	if err := sig.FromConfig(s.keyId, s.algorithm, s.headers); err != nil {
+	if err := sig.FromConfig(keyID, s.algorithm, s.headers); err != nil {
 		return "", err
 	}
 
@@ -56,7 +51,7 @@ func (s Signer) createHTTPSignatureString(r *http.Request) (string, error) {
 		return "", err
 	}
 
-	signature, err := sig.calculateSignature(s.keyLookup(s.keyId))
+	signature, err := sig.calculateSignature(keyB64)
 	if err != nil {
 		return "", err
 	}
@@ -65,7 +60,7 @@ func (s Signer) createHTTPSignatureString(r *http.Request) (string, error) {
 }
 
 // VerifyRequest verifies the signature added to the request and returns true if it is OK
-func VerifyRequest(r *http.Request, keyLookup func(keyId string) string, allowedClockSkew int, headers ...string) (bool, error) {
+func VerifyRequest(r *http.Request, keyLookUp func(keyID string) (string, error), allowedClockSkew int, headers ...string) (bool, error) {
 	sig := SignatureParameters{}
 
 	if err := sig.FromRequest(r); err != nil {
@@ -96,6 +91,9 @@ func VerifyRequest(r *http.Request, keyLookup func(keyId string) string, allowed
 			return false, errors.New("Date header is missing for clockSkew comparison")
 		}
 	}
-
-	return sig.Verify(keyLookup(sig.KeyID))
+	key, err := keyLookUp(sig.KeyID)
+	if err != nil {
+		return false, err
+	}
+	return sig.Verify(key)
 }

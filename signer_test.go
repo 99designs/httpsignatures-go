@@ -9,17 +9,13 @@ import (
 )
 
 var (
-	defaultKeyLookup = func(keyId string) string {
-		return testKey
-	}
-
 	// DefaultSha1Signer will sign requests with date using the SHA1 algorithm.
 	// Users are encouraged to create their own signer with the headers they require.
-	DefaultSha1Signer = NewSigner(testKeyID, defaultKeyLookup, "hmac-sha1")
+	DefaultSha1Signer = NewSigner("hmac-sha1")
 
 	// DefaultSha256Signer will sign requests with date using the SHA256 algorithm.
 	// Users are encouraged to create their own signer with the headers they require.
-	DefaultSha256Signer = NewSigner(testKeyID, defaultKeyLookup, "hmac-sha256")
+	DefaultSha256Signer = NewSigner("hmac-sha256")
 )
 
 const (
@@ -43,7 +39,7 @@ func TestSignSha1(t *testing.T) {
 	}
 
 	// SignRequest places Signature header in request
-	err := DefaultSha1Signer.SignRequest(r)
+	err := DefaultSha1Signer.SignRequest(r, testKeyID, testKey)
 	assert.Nil(t, err)
 
 	// Read Signature header from request and verify fields
@@ -67,7 +63,7 @@ func TestSignSha256(t *testing.T) {
 	}
 
 	// SignRequest places Signature header in request
-	err := DefaultSha256Signer.SignRequest(r)
+	err := DefaultSha256Signer.SignRequest(r, testKeyID, testKey)
 	assert.Nil(t, err)
 
 	// Read Signature header from request and verify fields
@@ -91,11 +87,8 @@ func TestValidEd25119RequestIsValid(t *testing.T) {
 	}
 
 	// SignRequest places Signature header in request
-	keyLookUp := func(keyId string) string {
-		return ed25519TestPrivateKey
-	}
-	signer := NewSigner(ed25519TestPublicKey, keyLookUp, "ed25519")
-	err := signer.SignRequest(r)
+	signer := NewSigner("ed25519")
+	err := signer.SignRequest(r, ed25519TestPublicKey, ed25519TestPrivateKey)
 	assert.Nil(t, err)
 
 	// Read Signature header from request and verify fields
@@ -119,7 +112,7 @@ func TestSignSha256OmitHeaderLeadingTrailingWhitespace(t *testing.T) {
 	}
 
 	// SignRequest places Signature header in request
-	err := DefaultSha256Signer.SignRequest(r)
+	err := DefaultSha256Signer.SignRequest(r, testKeyID, testKey)
 	assert.Nil(t, err)
 
 	// Read Signature header from request and verify fields
@@ -142,8 +135,8 @@ func TestSignSha256DoubleHeaderField(t *testing.T) {
 	}
 
 	// SignRequest places Signature header in request
-	signer := NewSigner(testKeyID, defaultKeyLookup, "hmac-sha256", "cache-control", "date")
-	err := signer.SignRequest(r)
+	signer := NewSigner("hmac-sha256", "cache-control", "date")
+	err := signer.SignRequest(r, testKeyID, testKey)
 	assert.Nil(t, err)
 
 	// Read Signature header from request and verify fields
@@ -159,7 +152,7 @@ func TestSignWithMissingDateHeader(t *testing.T) {
 		Header: http.Header{},
 	}
 
-	err := DefaultSha1Signer.AuthRequest(r)
+	err := DefaultSha1Signer.AuthRequest(r, testKeyID, testKey)
 	assert.EqualError(t, err, `Missing required header 'date'`)
 }
 
@@ -170,27 +163,27 @@ func TestSignWithMissingHeader(t *testing.T) {
 		},
 	}
 
-	s := NewSigner(testKeyID, defaultKeyLookup, "hmac-sha1", "foo")
+	s := NewSigner("hmac-sha1", "foo")
 
-	err := s.SignRequest(r)
+	err := s.SignRequest(r, testKeyID, testKey)
 	assert.Equal(t, "Missing required header 'foo'", err.Error())
 }
 
 // Verifying
+func keyLookUp(keyID string) (string, error) {
+	return testKey, nil
+}
+
 func TestValidRequestIsValid(t *testing.T) {
 	r := &http.Request{
 		Header: http.Header{
 			"Date": []string{testDate},
 		},
 	}
-	err := DefaultSha256Signer.SignRequest(r)
+	err := DefaultSha256Signer.SignRequest(r, testKeyID, testKey)
 	assert.Nil(t, err)
 
-	var s SignatureParameters
-	err = s.FromRequest(r)
-	assert.Nil(t, err)
-
-	res, err := s.Verify(testKey)
+	res, err := VerifyRequest(r, keyLookUp, -1)
 	assert.True(t, res)
 	assert.Nil(t, err)
 }
@@ -201,17 +194,14 @@ func TestNotValidIfRequestHeadersChange(t *testing.T) {
 			"Date": []string{testDate},
 		},
 	}
-	err := DefaultSha256Signer.SignRequest(r)
+	err := DefaultSha256Signer.SignRequest(r, testKeyID, testKey)
 	assert.Nil(t, err)
 
 	r.Header.Set("Date", "Thu, 05 Jan 2012 21:31:41 GMT")
-	var s SignatureParameters
-	err = s.FromRequest(r)
-	assert.Nil(t, err)
 
-	res, err := s.Verify(testKey)
+	res, err := VerifyRequest(r, keyLookUp, -1)
 	assert.False(t, res)
-	assert.Nil(t, err)
+	assert.EqualError(t, err, "Signatures do not match")
 }
 
 func TestNotValidIfClockSkewExceeded(t *testing.T) {
@@ -223,16 +213,16 @@ func TestNotValidIfClockSkewExceeded(t *testing.T) {
 			"Date": []string{time.Now().Add(duration).Format(time.RFC1123)},
 		},
 	}
-	err = DefaultSha256Signer.SignRequest(r)
+	err = DefaultSha256Signer.SignRequest(r, testKeyID, testKey)
 	assert.Nil(t, err)
 
-	_, err = VerifyRequest(r, defaultKeyLookup, allowedClockSkew)
+	_, err = VerifyRequest(r, keyLookUp, allowedClockSkew)
 	assert.Nil(t, err)
 
-	_, err = VerifyRequest(r, defaultKeyLookup, allowedClockSkew-1)
+	_, err = VerifyRequest(r, keyLookUp, allowedClockSkew-1)
 	assert.EqualError(t, err, "Allowed clockskew exceeded")
 
-	_, err = VerifyRequest(r, defaultKeyLookup, 0)
+	_, err = VerifyRequest(r, keyLookUp, 0)
 	assert.EqualError(t, err, "You probably misconfigured allowedClockSkew, set to -1 to disable")
 }
 
@@ -242,12 +232,12 @@ func TestVerifyRequiredHeaderList(t *testing.T) {
 			"Date": []string{time.Now().Format(time.RFC1123)},
 		},
 	}
-	err := DefaultSha256Signer.SignRequest(r)
+	err := DefaultSha256Signer.SignRequest(r, testKeyID, testKey)
 	assert.Nil(t, err)
 
-	_, err = VerifyRequest(r, defaultKeyLookup, -1, "(request-target)")
+	_, err = VerifyRequest(r, keyLookUp, -1, "(request-target)")
 	assert.EqualError(t, err, "Required header not in header list")
 
-	_, err = VerifyRequest(r, defaultKeyLookup, -1, "date")
+	_, err = VerifyRequest(r, keyLookUp, -1, "date")
 	assert.Nil(t, err)
 }
