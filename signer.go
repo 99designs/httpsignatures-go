@@ -69,26 +69,26 @@ func VerifyRequest(r *http.Request, keyLookUp func(keyID string) (string, error)
 
 	for _, header := range headers {
 		if sig.Headers[header] == "" {
-			return false, errors.New("Required header not in header list")
+			return false, errors.New(ErrorRequiredHeaderNotInHeaderList)
 		}
 	}
 
 	if allowedClockSkew > -1 {
 		if allowedClockSkew == 0 {
-			return false, errors.New("You probably misconfigured allowedClockSkew, set to -1 to disable")
+			return false, errors.New(ErrorYouProbablyMisconfiguredAllowedClockSkew)
 		}
 		// check if difference between date and date.Now exceeds allowedClockSkew
 		if date := sig.Headers["date"]; len(date) != 0 {
 			if hdrDate, err := time.Parse(time.RFC1123, date); err == nil {
 				if (int)(time.Since(hdrDate).Seconds()) > (allowedClockSkew) {
-					return false, errors.New("Allowed clockskew exceeded")
+					return false, errors.New(ErrorAllowedClockskewExceeded)
 				}
 			} else {
 				return false, err
 			}
 
 		} else {
-			return false, errors.New("Date header is missing for clockSkew comparison")
+			return false, errors.New(ErrorDateHeaderIsMissingForClockSkewComparison)
 		}
 	}
 	key, err := keyLookUp(sig.KeyID)

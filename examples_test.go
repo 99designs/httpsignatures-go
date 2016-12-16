@@ -53,8 +53,12 @@ func Example_verification() {
 			httpsignatures.HeaderRequestTarget)
 
 		if err != nil {
-			// Probably a malformed header
-			http.Error(w, "Bad Request", http.StatusBadRequest)
+			httpErr, msg := httpsignatures.ErrorToHTTPCode(err.Error())
+			if httpErr == http.StatusInternalServerError {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			} else {
+				http.Error(w, msg, httpErr)
+			}
 			panic(err)
 		}
 

@@ -153,7 +153,7 @@ func TestSignWithMissingDateHeader(t *testing.T) {
 	}
 
 	err := DefaultSha1Signer.AuthRequest(r, testKeyID, testKey)
-	assert.EqualError(t, err, `Missing required header 'date'`)
+	assert.EqualError(t, err, ErrorMissingRequiredHeader+" 'date'")
 }
 
 func TestSignWithMissingHeader(t *testing.T) {
@@ -166,7 +166,7 @@ func TestSignWithMissingHeader(t *testing.T) {
 	s := NewSigner("hmac-sha1", "foo")
 
 	err := s.SignRequest(r, testKeyID, testKey)
-	assert.Equal(t, "Missing required header 'foo'", err.Error())
+	assert.EqualError(t, err, ErrorMissingRequiredHeader+" 'foo'")
 }
 
 // Verifying
@@ -201,7 +201,7 @@ func TestNotValidIfRequestHeadersChange(t *testing.T) {
 
 	res, err := VerifyRequest(r, keyLookUp, -1)
 	assert.False(t, res)
-	assert.EqualError(t, err, "Signatures do not match")
+	assert.EqualError(t, err, ErrorSignatureDdoNotMatch)
 }
 
 func TestNotValidIfClockSkewExceeded(t *testing.T) {
@@ -220,10 +220,10 @@ func TestNotValidIfClockSkewExceeded(t *testing.T) {
 	assert.Nil(t, err)
 
 	_, err = VerifyRequest(r, keyLookUp, allowedClockSkew-1)
-	assert.EqualError(t, err, "Allowed clockskew exceeded")
+	assert.EqualError(t, err, ErrorAllowedClockskewExceeded)
 
 	_, err = VerifyRequest(r, keyLookUp, 0)
-	assert.EqualError(t, err, "You probably misconfigured allowedClockSkew, set to -1 to disable")
+	assert.EqualError(t, err, ErrorYouProbablyMisconfiguredAllowedClockSkew)
 }
 
 func TestVerifyRequiredHeaderList(t *testing.T) {
@@ -236,7 +236,7 @@ func TestVerifyRequiredHeaderList(t *testing.T) {
 	assert.Nil(t, err)
 
 	_, err = VerifyRequest(r, keyLookUp, -1, "(request-target)")
-	assert.EqualError(t, err, "Required header not in header list")
+	assert.EqualError(t, err, ErrorRequiredHeaderNotInHeaderList)
 
 	_, err = VerifyRequest(r, keyLookUp, -1, "date")
 	assert.Nil(t, err)

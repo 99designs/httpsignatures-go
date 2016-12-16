@@ -13,7 +13,7 @@ var (
 	algorithmHmacSha256 = &Algorithm{"hmac-sha256", Hmac256Sign, Hmac256Verify}
 	algorithmEd25519    = &Algorithm{"ed25519", Ed25519Sign, Ed25519Verify}
 
-	errorUnknownAlgorithm = errors.New("Unknown Algorithm")
+	errorUnknownAlgorithm = errors.New("Unknown signature algorithm provided")
 )
 
 // Algorithm exports the main algorithm properties: name, sign, verify

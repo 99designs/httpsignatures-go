@@ -34,7 +34,7 @@ func (s *SignatureParameters) FromRequest(r *http.Request) error {
 		if h, ok := r.Header["Authorization"]; ok {
 			httpSignatureString = strings.TrimPrefix(h[0], "Signature ")
 		} else {
-			return errors.New("No Signature header found in request")
+			return errors.New(ErrorNoSignatureHeaderFoundInRequest)
 		}
 	}
 	if err := s.parseSignatureString(httpSignatureString); err != nil {
@@ -52,10 +52,10 @@ func (s *SignatureParameters) FromRequest(r *http.Request) error {
 // SignatureParameters struct
 func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers []string) error {
 	if len(keyId) == 0 {
-		return errors.New("No keyID configured")
+		return errors.New(ErrorNoKeyIDConfigured)
 	}
 	if len(algorithm) == 0 {
-		return errors.New("No algorithm configured")
+		return errors.New(ErrorNoAlgorithmConfigured)
 	}
 	s.KeyID = keyId
 
@@ -81,7 +81,7 @@ func (s *SignatureParameters) FromConfig(keyId string, algorithm string, headers
 // by the `headers` parameter in the configuration
 func (s *SignatureParameters) ParseRequest(r *http.Request) error {
 	if len(s.Headers) == 0 {
-		return errors.New("No headers config loaded")
+		return errors.New(ErrorNoHeadersConfigLoaded)
 	}
 	for header := range s.Headers {
 		switch header {
@@ -95,7 +95,7 @@ func (s *SignatureParameters) ParseRequest(r *http.Request) error {
 			if host := r.URL.Host; host != "" {
 				s.Headers[header] = strings.TrimSpace(host)
 			} else {
-				return errors.New("Request contains no host")
+				return errors.New(ErrorMissingRequiredHeader + " 'host'")
 			}
 		default:
 			// If there are multiple headers with the same name, add them all.
@@ -106,7 +106,7 @@ func (s *SignatureParameters) ParseRequest(r *http.Request) error {
 				}
 				s.Headers[header] = strings.Join(trimmedValues, ", ")
 			} else {
-				return fmt.Errorf("Missing required header '%s'", header)
+				return fmt.Errorf("%s '%s'", ErrorMissingRequiredHeader, header)
 			}
 		}
 	}
@@ -145,15 +145,15 @@ func (s *SignatureParameters) parseSignatureString(in string) error {
 	}
 
 	if len(s.Signature) == 0 {
-		return errors.New("Missing signature")
+		return errors.New(ErrorMissingSignatureParameterSignature)
 	}
 
 	if len(s.KeyID) == 0 {
-		return errors.New("Missing keyId")
+		return errors.New(ErrorMissingSignatureParameterKeyId)
 	}
 
 	if s.Algorithm == nil {
-		return errors.New("Missing algorithm")
+		return errors.New(ErrorMissingSignatureParameterAlgorithm)
 	}
 
 	return nil
@@ -255,10 +255,10 @@ func (h HeaderList) signingString() (string, error) {
 
 func requestTargetLine(req *http.Request) (string, error) {
 	if req.URL == nil {
-		return "", errors.New("URL not in Request")
+		return "", errors.New(ErrorURLNotInRequest)
 	}
 	if len(req.Method) == 0 {
-		return "", errors.New("Method not in Request")
+		return "", errors.New(ErrorMethodNotInRequest)
 	}
 
 	path := req.URL.Path
@@ -270,5 +270,5 @@ func headerLine(req *http.Request, header string) (string, error) {
 	if value := req.Header.Get(header); value != "" {
 		return fmt.Sprintf("%s: %s", header, value), nil
 	}
-	return "", fmt.Errorf("Missing required header '%s'", header)
+	return "", fmt.Errorf("%s '%s'", ErrorMissingRequiredHeader, header)
 }

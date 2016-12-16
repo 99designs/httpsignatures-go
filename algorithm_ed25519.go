@@ -26,6 +26,6 @@ func Ed25519Verify(publicKey *[]byte, message []byte, signature *[]byte) (bool, 
 	if ed25519.Verify(&pubKey, message, &sig) {
 		return true, nil
 	} else {
-		return false, errors.New("Signatures do not match")
+		return false, errors.New(ErrorSignatureDdoNotMatch)
 	}
 }
