@@ -16,9 +16,9 @@ import (
 
 var (
 	AlgorithmHmacSha256 = &Algorithm{"hmac-sha256", sha256.New, hmacSign}
-	AlgorithmHmacSha1   = &Algorithm{"hmac-sha1", sha1.New, hmacSign}
-	AlgorithmRsaSha1    = &Algorithm{"rsa-sha1", sha1.New, rsaSha1Sign}
-	AlgorithmRsaSha256  = &Algorithm{"rsa-sha256", sha256.New, rsaSha256Sign}
+	AlgorithmHmacSha1 = &Algorithm{"hmac-sha1", sha1.New, hmacSign}
+	AlgorithmRsaSha1 = &Algorithm{"rsa-sha1", sha1.New, rsaSha1Sign}
+	AlgorithmRsaSha256 = &Algorithm{"rsa-sha256", sha256.New, rsaSha256Sign}
 
 	ErrorUnknownAlgorithm = errors.New("Unknown Algorithm")
 )
@@ -84,6 +84,12 @@ func parsePrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 			return nil, err
 		}
 		return rsa, nil
+	case "PRIVATE KEY":
+		rsaz, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		return rsaz.(*rsa.PrivateKey), nil
 	default:
 		return nil, fmt.Errorf("ssh: unsupported key type %q", block.Type)
 	}
