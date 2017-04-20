@@ -1,137 +1,150 @@
 package httpsignatures
 
 import (
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 const (
-	TEST_SIGNATURE = `keyId="Test",algorithm="hmac-sha256",signature="JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ="`
-	TEST_HASH      = `JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ=`
-	TEST_KEY       = "SomethingRandom"
-	TEST_DATE      = "Thu, 05 Jan 2012 21:31:40 GMT"
-	TEST_KEY_ID    = "Test"
+	testSignature = `keyId="Test",algorithm="hmac-sha256",signature="JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ="`
+	testHash      = `JldXnt8W9t643M2Sce10gqCh/+E7QIYLiI+bSjnFBGCti7s+mPPvOjVb72sbd1FjeOUwPTDpKbrQQORrm+xBYfAwCxF3LBSSzORvyJ5nRFCFxfJ3nlQD6Kdxhw8wrVZX5nSem4A/W3C8qH5uhFTRwF4ruRjh+ENHWuovPgO/HGQ=`
+	testKey       = "U29tZXRoaW5nUmFuZG9t"
+	testDate      = "Thu, 05 Jan 2012 21:31:40 GMT"
+	testKeyID     = "Test"
 )
 
 func TestCreateSignatureFromAuthorizationHeader(t *testing.T) {
 	r := http.Request{
 		Header: http.Header{
-			"Date":              []string{TEST_DATE},
-			headerAuthorization: []string{authScheme + TEST_SIGNATURE},
+			"Date":              []string{testDate},
+			headerAuthorization: []string{authScheme + testSignature},
 		},
 	}
 
-	s, err := FromRequest(&r)
+	var s Signature
+	err := s.FromRequest(&r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, "Test", s.KeyID)
 	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
-	assert.Equal(t, TEST_HASH, s.Signature)
+	assert.Equal(t, testHash, s.Signature)
 
-	assert.Equal(t, s.String(), TEST_SIGNATURE)
+	assert.Equal(t, s.ToString(), testSignature)
 }
 
 func TestCreateSignatureFromSignatureHeaderHeader(t *testing.T) {
 	r := http.Request{
 		Header: http.Header{
-			"Date":          []string{TEST_DATE},
-			headerSignature: []string{TEST_SIGNATURE},
+			"Date":          []string{testDate},
+			HeaderSignature: []string{testSignature},
 		},
 	}
 
-	s, err := FromRequest(&r)
+	var s Signature
+	err := s.FromRequest(&r)
 	assert.Nil(t, err)
 
 	assert.Equal(t, "Test", s.KeyID)
 	assert.Equal(t, AlgorithmHmacSha256, s.Algorithm)
-	assert.Equal(t, TEST_HASH, s.Signature)
+	assert.Equal(t, testHash, s.Signature)
 
-	assert.Equal(t, s.String(), TEST_SIGNATURE)
+	assert.Equal(t, s.ToString(), testSignature)
 }
 
 func TestCreateSignatureWithNoSignature(t *testing.T) {
 	r := http.Request{
 		Header: http.Header{
-			"Date": []string{TEST_DATE},
+			"Date": []string{testDate},
 		},
 	}
 
-	s, err := FromRequest(&r)
+	var s Signature
+	err := s.FromRequest(&r)
 	assert.Equal(t, ErrorNoSignatureHeader, err)
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{}, s)
 }
 
 func TestCreateWithMissingSignature(t *testing.T) {
-	s, err := FromString(`keyId="Test",algorithm="hmac-sha256"`)
+	var s Signature
+	err := s.FromString(`keyId="Test",algorithm="hmac-sha256"`)
 	assert.Equal(t, "Missing signature", err.Error())
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{KeyID: "Test", Algorithm: AlgorithmHmacSha256}, s)
 }
 
 func TestCreateWithMissingAlgorithm(t *testing.T) {
-	s, err := FromString(`keyId="Test",signature="fffff"`)
+	var s Signature
+	err := s.FromString(`keyId="Test",signature="fffff"`)
 	assert.Equal(t, "Missing algorithm", err.Error())
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{KeyID: "Test", Signature: "fffff"}, s)
 }
 
 func TestCreateWithMissingKeyId(t *testing.T) {
-	s, err := FromString(`algorithm="hmac-sha256",signature="fffff"`)
+	var s Signature
+	err := s.FromString(`algorithm="hmac-sha256",signature="fffff"`)
 	assert.Equal(t, "Missing keyId", err.Error())
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{Algorithm: AlgorithmHmacSha256, Signature: "fffff"}, s)
 }
 
 func TestCreateWithInvalidKey(t *testing.T) {
-	s, err := FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",garbage="bob"`)
+	var s Signature
+	err := s.FromString(`keyId="Test",algorithm="hmac-sha256",signature="fffff",garbage="bob"`)
 	assert.Equal(t, "Unexpected key in signature 'garbage'", err.Error())
-	assert.Nil(t, s)
+	assert.Equal(t, Signature{KeyID: "Test", Algorithm: AlgorithmHmacSha256, Signature: "fffff"}, s)
 }
 
 func TestValidRequestIsValid(t *testing.T) {
 	r := &http.Request{
 		Header: http.Header{
-			"Date": []string{TEST_DATE},
+			"Date": []string{testDate},
 		},
 	}
-	err := DefaultSha256Signer.SignRequest(TEST_KEY_ID, TEST_KEY, r)
+	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	sig, err := FromRequest(r)
+	var s Signature
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.True(t, sig.IsValid(TEST_KEY, r))
+	res, err := s.Verify(testKey, r)
+	assert.True(t, res)
+	assert.Nil(t, err)
 }
 
 func TestNotValidIfRequestHeadersChange(t *testing.T) {
 	r := &http.Request{
 		Header: http.Header{
-			"Date": []string{TEST_DATE},
+			"Date": []string{testDate},
 		},
 	}
-	err := DefaultSha256Signer.SignRequest(TEST_KEY_ID, TEST_KEY, r)
+	err := DefaultSha256Signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
 	r.Header.Set("Date", "Thu, 05 Jan 2012 21:31:41 GMT")
-	sig, err := FromRequest(r)
+	var s Signature
+	err = s.FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.False(t, sig.IsValid(TEST_KEY, r))
+	res, err := s.Verify(testKey, r)
+	assert.False(t, res)
+	assert.Nil(t, err)
 }
 
 func TestNotValidIfRequestIsMissingDate(t *testing.T) {
 	r := &http.Request{
-		Header: http.Header{
-			"Date": []string{TEST_DATE},
-		},
+		Header: http.Header{},
 	}
 
-	s := Signer{AlgorithmHmacSha1, HeaderList{RequestTarget}}
+	signer := Signer{AlgorithmHmacSha1, HeaderList{RequestTarget}}
 
-	err := s.SignRequest(TEST_KEY_ID, TEST_KEY, r)
+	err := signer.SignRequest(testKeyID, testKey, r)
 	assert.Nil(t, err)
 
-	sig, err := FromRequest(r)
+	var signature Signature
+	err = signature.FromRequest(r)
 	assert.Nil(t, err)
 
-	assert.False(t, sig.IsValid(TEST_KEY, r))
+	res, err := signature.Verify(testKey, r)
+	assert.False(t, res)
+	assert.EqualError(t, err, "No Date Header Supplied")
 }

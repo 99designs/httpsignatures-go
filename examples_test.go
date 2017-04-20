@@ -32,7 +32,8 @@ func Example_customSigning() {
 
 func Example_verification() {
 	_ = func(w http.ResponseWriter, r *http.Request) {
-		sig, err := httpsignatures.FromRequest(r)
+		var sig httpsignatures.Signature
+		err := sig.FromRequest(r)
 		if err != nil {
 			// Probably a malformed header
 			http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -43,9 +44,13 @@ func Example_verification() {
 		// that they are in sig.Headers
 
 		var key string // = lookup using sig.KeyID
-		if !sig.IsValid(key, r) {
+		res, err := sig.Verify(key, r)
+		if !res {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
+		}
+		if err != nil {
+			http.Error(w, "Error", http.StatusInternalServerError)
 		}
 
 		// request was signed correctly.

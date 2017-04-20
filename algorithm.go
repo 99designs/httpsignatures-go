@@ -1,29 +1,27 @@
 package httpsignatures
 
 import (
-	"crypto/sha1"
-	"crypto/sha256"
 	"errors"
-	"hash"
 )
 
 var (
-	AlgorithmHmacSha256 = &Algorithm{"hmac-sha256", sha256.New}
-	AlgorithmHmacSha1   = &Algorithm{"hmac-sha1", sha1.New}
+	AlgorithmHmacSha1   = &Algorithm{"hmac-sha1", Hmac1Sign, Hmac1Verify}
+	AlgorithmHmacSha256 = &Algorithm{"hmac-sha256", Hmac256Sign, Hmac256Verify}
 
 	ErrorUnknownAlgorithm = errors.New("Unknown Algorithm")
 )
 
 type Algorithm struct {
-	name string
-	hash func() hash.Hash
+	Name   string
+	Sign   func(privateKey *[]byte, message []byte) (*[]byte, error)
+	Verify func(key *[]byte, message []byte, signature *[]byte) (bool, error)
 }
 
 func algorithmFromString(name string) (*Algorithm, error) {
 	switch name {
-	case AlgorithmHmacSha1.name:
+	case AlgorithmHmacSha1.Name:
 		return AlgorithmHmacSha1, nil
-	case AlgorithmHmacSha256.name:
+	case AlgorithmHmacSha256.Name:
 		return AlgorithmHmacSha256, nil
 	}
 
