@@ -4,6 +4,7 @@ package httpsignatures
 
 import (
 	"crypto/hmac"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -140,7 +141,8 @@ func (s Signature) IsValid(key string, r *http.Request) bool {
 	if err != nil {
 		return false
 	}
-	return s.Signature == sig
+
+	return subtle.ConstantTimeCompare([]byte(s.Signature), []byte(sig)) == 1
 }
 
 type HeaderList []string
