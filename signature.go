@@ -3,8 +3,7 @@
 package httpsignatures
 
 import (
-	"crypto/hmac"
-	"crypto/subtle"
+	"crypto/rsa"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -107,21 +106,22 @@ func (s Signature) String() string {
 	return str
 }
 
-func (s Signature) calculateSignature(key string, r *http.Request) (string, error) {
-	hash := hmac.New(s.Algorithm.hash, []byte(key))
-
+func (s Signature) calculateSignature(key interface{}, r *http.Request) (string, error) {
 	signingString, err := s.Headers.signingString(r)
 	if err != nil {
 		return "", err
 	}
 
-	hash.Write([]byte(signingString))
+	b, err := s.Algorithm.sign(key, []byte(signingString))
+	if err != nil {
+		return "", err
+	}
 
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
+	return base64.StdEncoding.EncodeToString(b), nil
 }
 
 // Sign this signature using the given key
-func (s *Signature) sign(key string, r *http.Request) error {
+func (s *Signature) sign(key interface{}, r *http.Request) error {
 	sig, err := s.calculateSignature(key, r)
 	if err != nil {
 		return err
@@ -133,16 +133,32 @@ func (s *Signature) sign(key string, r *http.Request) error {
 
 // IsValid validates this signature for the given key
 func (s Signature) IsValid(key string, r *http.Request) bool {
+	return s.isValid(key, r)
+}
+
+// IsValidRSA validates that the request was signed by an RSA private key, using
+// the public key for verification. This method should only be called when the
+// underlying Algorithm is an RSA backed implementation.
+func (s Signature) IsValidRSA(key *rsa.PublicKey, r *http.Request) bool {
+	return s.isValid(key, r)
+}
+
+func (s Signature) isValid(key interface{}, r *http.Request) bool {
 	if !s.Headers.hasDate() {
 		return false
 	}
 
-	sig, err := s.calculateSignature(key, r)
+	signingString, err := s.Headers.signingString(r)
 	if err != nil {
 		return false
 	}
 
-	return subtle.ConstantTimeCompare([]byte(s.Signature), []byte(sig)) == 1
+	signature, err := base64.StdEncoding.DecodeString(s.Signature)
+	if err != nil {
+		return false
+	}
+
+	return s.Algorithm.verify(key, []byte(signingString), signature)
 }
 
 type HeaderList []string
