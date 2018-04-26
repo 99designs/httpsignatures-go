@@ -1,6 +1,7 @@
 package httpsignatures
 
 import (
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"net/http"
 	"strings"
@@ -29,6 +30,11 @@ var (
 	// DefaultRsaSha256Signer will sign requests with the url and date using the SHA256 algorithm.
 	// Users are encouraged to create their own signer with the headers they require.
 	DefaultRsaSha256Signer = NewSigner(AlgorithmRsaSha256, RequestTarget, "date")
+
+	// DefaultEcdsaSha256Signer will sign requests with the url and date
+	// using the SHA256 algorithm.  Users are encouraged to create their own
+	// signer with the headers they require.
+	DefaultEcdsaSha256Signer = NewSigner(AlgorithmEcdsaSha256, RequestTarget, "date")
 )
 
 func NewSigner(algorithm *Algorithm, headers ...string) *Signer {
@@ -56,9 +62,13 @@ func (s Signer) SignRequest(keyId string, key interface{}, r *http.Request) erro
 	return nil
 }
 
-// SignRequestRSA signs a request with an RSA private key. This method should
-// only be called when the underlying Algorithm is an RSA backed implementation.
+// SignRequestRSA signs a request with an RSA private key.
 func (s Signer) SignRequestRSA(keyId string, key *rsa.PrivateKey, r *http.Request) error {
+	return s.SignRequest(keyId, key, r)
+}
+
+// SignRequestECDSA signs a request with an ECDSA private key.
+func (s Signer) SignRequestECDSA(keyId string, key *ecdsa.PrivateKey, r *http.Request) error {
 	return s.SignRequest(keyId, key, r)
 }
 

@@ -1,6 +1,9 @@
 package httpsignatures
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
 	"net/http"
@@ -148,6 +151,27 @@ func TestValidRequestIsValid_RsaSha256(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.True(t, sig.IsValidRSA(&privateKey.PublicKey, r))
+}
+
+func TestValidRequestIsValid_EcdsaSha256(t *testing.T) {
+	r := &http.Request{
+		Header: http.Header{
+			"Date": []string{TEST_DATE},
+		},
+	}
+
+	privateKey, err := ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = DefaultEcdsaSha256Signer.SignRequestECDSA(TEST_KEY_ID, privateKey, r)
+	assert.Nil(t, err)
+
+	sig, err := FromRequest(r)
+	assert.Nil(t, err)
+
+	assert.True(t, sig.IsValidECDSA(&privateKey.PublicKey, r))
 }
 
 func TestNotValidIfRequestHeadersChange(t *testing.T) {

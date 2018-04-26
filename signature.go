@@ -3,6 +3,7 @@
 package httpsignatures
 
 import (
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/base64"
 	"errors"
@@ -151,9 +152,14 @@ func (s Signature) IsValid(key interface{}, r *http.Request) bool {
 }
 
 // IsValidRSA validates that the request was signed by an RSA private key, using
-// the public key for verification. This method should only be called when the
-// underlying Algorithm is an RSA backed implementation.
+// the public key for verification.
 func (s Signature) IsValidRSA(key *rsa.PublicKey, r *http.Request) bool {
+	return s.IsValid(key, r)
+}
+
+// IsValidECDSA validates that the request was signed by an ECDSA private key,
+// using the public key for verification.
+func (s Signature) IsValidECDSA(key *ecdsa.PublicKey, r *http.Request) bool {
 	return s.IsValid(key, r)
 }
 

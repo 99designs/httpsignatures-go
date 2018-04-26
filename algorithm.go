@@ -1,18 +1,22 @@
 package httpsignatures
 
 import (
+	"bytes"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"math/big"
 )
 
 var (
-	AlgorithmHmacSha256 = &Algorithm{"hmac-sha256", hmacSign(crypto.SHA256), hmacVerify(crypto.SHA256)}
-	AlgorithmHmacSha1   = &Algorithm{"hmac-sha1", hmacSign(crypto.SHA1), hmacVerify(crypto.SHA1)}
-	AlgorithmRsaSha256  = &Algorithm{"rsa-sha256", rsaSign(crypto.SHA256), rsaVerify(crypto.SHA256)}
-	AlgorithmRsaSha1    = &Algorithm{"rsa-sha1", rsaSign(crypto.SHA1), rsaVerify(crypto.SHA1)}
+	AlgorithmHmacSha256  = &Algorithm{"hmac-sha256", hmacSign(crypto.SHA256), hmacVerify(crypto.SHA256)}
+	AlgorithmHmacSha1    = &Algorithm{"hmac-sha1", hmacSign(crypto.SHA1), hmacVerify(crypto.SHA1)}
+	AlgorithmRsaSha256   = &Algorithm{"rsa-sha256", rsaSign(crypto.SHA256), rsaVerify(crypto.SHA256)}
+	AlgorithmRsaSha1     = &Algorithm{"rsa-sha1", rsaSign(crypto.SHA1), rsaVerify(crypto.SHA1)}
+	AlgorithmEcdsaSha256 = &Algorithm{"ecdsa-sha256", ecdsaSign(crypto.SHA256), ecdsaVerify(crypto.SHA256)}
 
 	ErrorUnknownAlgorithm = errors.New("Unknown Algorithm")
 )
@@ -40,6 +44,8 @@ func algorithmFromString(name string) (*Algorithm, error) {
 		return AlgorithmRsaSha1, nil
 	case AlgorithmRsaSha256.name:
 		return AlgorithmRsaSha256, nil
+	case AlgorithmEcdsaSha256.name:
+		return AlgorithmEcdsaSha256, nil
 	}
 
 	return nil, ErrorUnknownAlgorithm
@@ -88,5 +94,61 @@ func rsaVerify(h crypto.Hash) verifyFn {
 		hash.Write(m)
 		hashed := hash.Sum(nil)
 		return rsa.VerifyPKCS1v15(k.(*rsa.PublicKey), h, hashed[:], s) == nil
+	}
+}
+
+// ecdsaSign returns a function that will sign a message with an RSA private key,
+// using the given hash function.
+//
+// http://self-issued.info/docs/draft-ietf-jose-json-web-algorithms-00.html#DefiningECDSA
+func ecdsaSign(h crypto.Hash) signFn {
+	return func(k interface{}, m []byte) ([]byte, error) {
+		privateKey := k.(*ecdsa.PrivateKey)
+
+		hash := h.New()
+		hash.Write(m)
+		hashed := hash.Sum(nil)
+
+		r, s, err := ecdsa.Sign(rand.Reader, privateKey, hashed[:])
+		if err != nil {
+			return nil, err
+		}
+
+		rBytes := pad(r.Bytes(), 32)
+		sBytes := pad(s.Bytes(), 32)
+
+		sig := append(rBytes, sBytes...)
+
+		return sig, nil
+	}
+}
+
+// pad left pads the byte array with 0's until b is of length l.
+func pad(b []byte, l int) []byte {
+	r := l - len(b)
+	p := bytes.Repeat([]byte{0}, r)
+	return append(p, b...)
+}
+
+// ecdsaVerify returns a function that will verify that a message was signed with
+// an ECDSA private key.
+func ecdsaVerify(h crypto.Hash) verifyFn {
+	return func(k interface{}, m []byte, sig []byte) bool {
+		if len(sig) != 64 {
+			return false
+		}
+
+		hash := h.New()
+		hash.Write(m)
+		hashed := hash.Sum(nil)
+
+		r := new(big.Int)
+		s := new(big.Int)
+		l := len(sig) / 2
+
+		r.SetBytes(sig[0:l])
+		s.SetBytes(sig[l:])
+
+		return ecdsa.Verify(k.(*ecdsa.PublicKey), hashed[:], r, s)
 	}
 }
